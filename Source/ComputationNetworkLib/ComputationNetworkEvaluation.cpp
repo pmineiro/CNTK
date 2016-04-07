@@ -42,7 +42,7 @@ void ComputationNetwork::ForwardProp(const ComputationNodeBasePtr rootNode)
     // traverse all nodes in the pre-determined evaluation order
 	if (m_enableSublinearMemory) {
 		shared_ptr<FlowControlNode> flowControlNode = dynamic_pointer_cast<FlowControlNode>(GetNestedNetwork(rootNode));
-		if (rootNode->GetName() == wstring(L"Err")) {
+        if (rootNode->GetName() == wstring(L"Err") || rootNode->GetName() == wstring(L"net.err")) {
 			flowControlNode->SetForwardMethod(FlowControlNode::ForwardMethod::FORWARD_KEYRECORD);
 			m_cacheNetwork = flowControlNode;
 		}
@@ -205,14 +205,14 @@ ComputationNetwork::PARTraversalFlowControlNode::PARTraversalFlowControlNode(con
 
 		m_partialRecordPeriod.clear();
 		for (int i = 0; i < m_nestedNodes.size(); i++) {
-			if (!m_nestedNodes[i]->IsValueSharable()) continue;
+            if (!m_nestedNodes[i]->IsValueSharable()) continue;
 			count++;
 			bool isSafeReorde = true;
 			for (int j = i + 1; j < m_nestedNodes.size(); j++) {
 				int numInputs = m_nestedNodes[j]->GetNumInputs();
 				for (int index = 0; index < numInputs; index++) {
 					auto& input = m_nestedNodes[j]->GetInputs()[index];
-					if (!input->IsValueSharable()) continue;
+                    if (!input->IsValueSharable()) continue;
 					int orderA = order.find(m_nestedNodes[i])->second;
 					int orderB = order.find(input)->second;
 					if (orderB < orderA) isSafeReorde = false;
@@ -278,7 +278,7 @@ ComputationNetwork::PARTraversalFlowControlNode::PARTraversalFlowControlNode(con
 						if (dependency.find(input) != dependency.end()) {
 							dependency[input]--;// = max(dependency[input] - 1, 0);
 							if (recordTrigger) {
-								if (dependency[input] || !input->IsValueSharable() || !input->GetNumInputs() ||
+                                if (dependency[input] || !input->IsValueSharable() || !input->GetNumInputs() ||
 									input->GetName() == m_partialRecordPeriod[periodIndex].first) {
 									continue;
 								}
