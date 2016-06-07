@@ -56,6 +56,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ACML_PATH)\include;$(SolutionDir)Source\Common\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4819</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(ACML_PATH)\lib;$(OutDir)</AdditionalLibraryDirectories>
