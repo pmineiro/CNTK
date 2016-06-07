@@ -517,7 +517,7 @@ void HTKMLFReader<ElemType>::PrepareForTrainingOrTesting(const ConfigRecordType&
         m_lattices->setverbosity(m_verbosity);
 
         // now get the frame source. This has better randomization and doesn't create temp files
-        bool minimizeReaderMemoryFootprint = readerConfig(L"minimizeReaderMemoryFootprint", true);
+        bool minimizeReaderMemoryFootprint = false; // readerConfig(L"minimizeReaderMemoryFootprint", true);
         m_frameSource.reset(new msra::dbn::minibatchutterancesourcemulti(infilesmulti, labelsmulti, m_featDims, m_labelDims, 
                                                                          numContextLeft, numContextRight, randomize, 
                                                                          *m_lattices, m_latticeMap, m_frameMode, 
