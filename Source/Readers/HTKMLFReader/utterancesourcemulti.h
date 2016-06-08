@@ -542,7 +542,7 @@ class minibatchutterancesourcemulti : public minibatchsource
 
         void reset(unsigned int randSeed)
         {
-            srand(randSeed);
+            srand(randSeed + 42);
             size_t sweepts = m_randomizedChunks[0][0].globalts;
             size_t totalFrames = m_randomizedChunks[0].back().globalte() - sweepts;
             if (m_minimizeMemoryFootprint)
@@ -1200,7 +1200,7 @@ private:
     {
         if (v.size() > RAND_MAX * (size_t) RAND_MAX)
             RuntimeError("randomshuffle: too large set: need to change to different random generator!");
-        srand((unsigned int) randomseed);
+        srand((unsigned int) randomseed + 42);
         foreach_index (i, v)
         {
             // pick a random location
@@ -1348,7 +1348,7 @@ private:
             // check we got those setup right
 
             // we now randomly shuffle randomizedutterancerefs[pos], while considering the constraints of what chunk range needs to be in memory
-            srand((unsigned int) sweep + 1);
+            srand((unsigned int) sweep + 1 + 42);
             for (size_t i = 0; i < randomizedutterancerefs.size(); i++)
             {
                 // get valid randomization range, expressed in chunks
