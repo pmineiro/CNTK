@@ -889,7 +889,6 @@ size_t SGD<ElemType>::TrainOneEpoch(ComputationNetworkPtr net,
             break;                                                                // end of epoch
         }
         ProfilerTimeEnd(profilerScope);
-        profilerScope = ProfilerTimeBegin(profilerEvtMainFB);
 
         // Note: If !wasDataRead then the data that GetMinibatchIntoNetwork() was supposed to full in are undefined.
         // Must not touch them.
@@ -909,6 +908,8 @@ size_t SGD<ElemType>::TrainOneEpoch(ComputationNetworkPtr net,
 
         if (actualMBSize > 0)
         {
+			PROFILE_SCOPE(profilerEvtMainFB);
+
             assert(wasDataRead);
 #ifndef EVALDLL
             if (m_doGradientCheck && GradientCheck(net, criterionNodes, learnableNodes, 0) == false)
@@ -975,14 +976,11 @@ size_t SGD<ElemType>::TrainOneEpoch(ComputationNetworkPtr net,
             if (actualNumSubminibatches > 1)
                 smbDispatcher.DoneWithCurrentMinibatch();
 
-            
+#ifndef CPUONLY
+			cudaDeviceSynchronize();
+#endif
         } // if (actualMBSize > 0)
 
-#ifndef CPUONLY
-        cudaDeviceSynchronize();
-#endif
-
-        ProfilerTimeEnd(profilerScope);
         profilerScope = ProfilerTimeBegin(profilerEvtMainGradient);
 
         // for progress and statistics, we should only count frames that are not gaps
