@@ -510,12 +510,12 @@ Sequences = [
 Loop = [
     # get the current iteration index w.r.t a node in a loop, such as a Delay node
     Iteration (x) = [
-      agg = OnesLike (x) + PastValue(agg, defaultHiddenActivation=0) // a recurrence that sums up ones
+      agg = Constants.OnesLike (x) + PastValue(0, agg, defaultHiddenActivation=0) // a recurrence that sums up ones
     ].agg
 
     # get the total length of a sequence
     # TODO: in LINQ, this is an aggregation operation, so it would be long into Sequences
-    Count(x) = Sequences.Last (1, Iteration (x)) // take last item of recurrence that sums up ones
+    Count(x) = Sequences.Last (Iteration (x)) // take last item of recurrence that sums up ones
 
     # is the current iteration the first/last of the loop?
     IsFirst (x) = _IsWithin (PastValue,   1, x)
@@ -721,6 +721,29 @@ RNNs =
             h = Splice ((fwd.h : bwd.h), axis=1)
             c = Splice ((fwd.c : bwd.c), axis=1)
             dim = layerDims[i] * 2  # output dimension
+        ]
+    ].layers
+
+    # a stack of recurrent LSTMs (bidirectional with residual learning)
+    RecurrentBiresidualLSTMPStack (layerDims, cellDims=layerDims, input, inputDim=input.dim, previousHook=PreviousHC, nextHook=NextHC, enableSelfStabilization=false) = [
+        previousHook1 = previousHook ; nextHook1 = nextHook ; useStabilizer = enableSelfStabilization
+        layers[i:0..Length (layerDims)-1] =
+        [
+            v    = if i == 0 then input    else Parameters.Stabilize (layers[i-1].h, enabled=useStabilizer)
+            vDim = if i == 0 then inputDim else                       layers[i-1].dim
+            fwd = RecurrentLSTMP (layerDims[i], cellDim=cellDims[i],
+                                  v, inputDim=vDim,
+                                  previousHook=previousHook1,
+                                  layerIndex=i,
+                                  enableSelfStabilization=useStabilizer)
+            bwd = RecurrentLSTMP (layerDims[i], cellDim=cellDims[i],
+                                  v, inputDim=vDim,
+                                  previousHook=nextHook1,
+                                  layerIndex=i,
+                                  enableSelfStabilization=useStabilizer)
+            h = fwd.h + bwd.h + v
+            c = fwd.c + bwd.c
+            dim = layerDims[i]
         ]
     ].layers
 ]
