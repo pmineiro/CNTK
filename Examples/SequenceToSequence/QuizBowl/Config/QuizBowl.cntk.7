@@ -1,7 +1,7 @@
 ########################################################################
-# residual learning version of experiment 3, 1 layer
+# residual learning version of experiment 3: 4 layers
 # 
-# 2.4% / 43% train / dev error
+# 2.4% / 50% train / dev error
 #
 ########################################################################
 
@@ -12,16 +12,16 @@ OutDir     = "$RunRootDir$/Out"
 command = train
 
 deviceId = auto 
-ExpId = quizbowl-4
+ExpId = quizbowl-7
 
 modelPath  = "$OutDir$/$ExpId$/QuizBowl.dnn"
 stderr     = "$OutDir$/$ExpId$/QuizBowl"
 
 inputVocabDim = 26665
 labelDim = 2370
-hiddenDim = 60
-embeddingDim = 60
-maxLayer = 1
+hiddenDim = 40
+embeddingDim = 40
+maxLayer = 4
 
 #---------------------------
 # network
