@@ -664,8 +664,30 @@ RNNs =
                                   previousHook=nextHook1,
                                   layerIndex=i)
             h = Splice ((fwd.h : bwd.h), axis=1)
-            c = Splice ((fwd.c : bwd.c), axis=1)
             dim = layerDims[i] * 2  # output dimension
+        ]
+    ].layers
+
+    # a stack of recurrent GRUs (biresidual)
+    # TODO: Should we define layerDims as the total (sum of both forward and backward direction)?
+    RecurrentBiresidualGRUStack (layerDims, input, inputDim=input.dim, previousHook=GRUPreviousHC, nextHook=GRUNextHC) = [
+        previousHook1 = previousHook ; nextHook1 = nextHook ; 
+
+        layers[i:0..Length (layerDims)-1] =
+        [
+            v    = if i == 0 then input    else layers[i-1].h
+            vDim = if i == 0 then inputDim else layers[i-1].dim
+
+            fwd = RecurrentGRU (layerDims[i], 
+                                  v, inputDim=vDim,
+                                  previousHook=previousHook1,
+                                  layerIndex=i)
+            bwd = RecurrentGRU (layerDims[i], 
+                                  v, inputDim=vDim,
+                                  previousHook=nextHook1,
+                                  layerIndex=i)
+            h = fwd.h + bwd.h + v
+            dim = layerDims[i] 
         ]
     ].layers
 

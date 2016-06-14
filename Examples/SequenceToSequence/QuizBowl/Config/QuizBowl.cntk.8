@@ -1,0 +1,150 @@
+########################################################################
+# GRU residual learning version of experiment 3, 1 layer
+# 
+# 2.4% / 35.5% train / dev error
+#
+########################################################################
+
+RunRootDir = ".."      # default if not overridden
+DataDir    = "$RunRootDir$/Data"
+OutDir     = "$RunRootDir$/Out"
+
+command = train
+
+deviceId = auto 
+ExpId = quizbowl-8
+
+modelPath  = "$OutDir$/$ExpId$/QuizBowl.dnn"
+stderr     = "$OutDir$/$ExpId$/QuizBowl"
+
+inputVocabDim = 26665
+labelDim = 2370
+hiddenDim = 60
+embeddingDim = 60
+maxLayer = 1
+
+#---------------------------
+# network
+#---------------------------
+
+BrainScriptNetworkBuilder = (new ComputationNetwork [
+  inputVocabDim = $inputVocabDim$
+  labelDim = $labelDim$
+  hiddenDim = $hiddenDim$
+  embeddingDim = $embeddingDim$
+  precision = "float"
+  maxLayer = $maxLayer$
+  
+  netDims[i:0..maxLayer] = hiddenDim
+
+  inputAxis = DynamicAxis()
+  Word = Input (inputVocabDim, dynamicAxis=inputAxis, tag='feature')
+  Answer = Input (labelDim, tag='label')
+  
+  Einput = BS.Parameters.WeightParam ($inputVocabDim$, embeddingDim)
+  inputEmbedded = TransposeTimes (Einput, Word)
+  net = BS.RNNs.RecurrentBiresidualGRUStack (netDims, inputEmbedded, inputDim=embeddingDim)
+  netOutput = net[Length (netDims) - 1].h
+  avgNetOutput = [
+    mysum = netOutput + PastValue (0, mysum, defaultHiddenActivation=0)
+    mycount = BS.Constants.OnesLike (netOutput) + PastValue (0, mycount, defaultHiddenActivation=0)
+    myavg = ElementDivide (mysum, mycount)
+  ].myavg
+  lastAvgNetOutput = BS.Sequences.Last (avgNetOutput)
+
+  wOutput = BS.Parameters.WeightParam (net[Length (netDims) - 1].dim, $labelDim$)
+  bOutput = BS.Parameters.BiasParam ($labelDim$)
+  prePreSoftMax = TransposeTimes (wOutput, lastAvgNetOutput) 
+  preSoftMax = prePreSoftMax + bOutput
+  recPreSoftMax = ReconcileDynamicAxis (preSoftMax, Answer)
+  ce = CrossEntropyWithSoftmax (Answer, recPreSoftMax, tag='criterion')
+  errs = ErrorPrediction (Answer, recPreSoftMax, tag='evaluation')
+])
+
+train = [
+  action = "train"
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/quizbowl.train"
+    randomize = "true"
+
+    input = [ 
+      Word = [ 
+        dim = "$inputVocabDim$"
+        format = "sparse"
+      ]
+      Answer = [
+        dim = "$labelDim$"
+        format = "sparse"
+      ]
+    ]
+  ]
+
+  cvReader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/quizbowl.dev"
+    randomize = "false"
+
+    input = [ 
+      Word = [ 
+        dim = "$inputVocabDim$"
+        format = "sparse"
+      ]
+      Answer = [
+        dim = "$labelDim$"
+        format = "sparse"
+      ]
+    ]
+  ]
+
+  SGD = [ 
+    modelPath = "$modelPath$"
+    epochSize = 0
+    keepCheckPointFiles = "false"
+    maxEpochs = 200
+    minibatchSize = 128
+    learningRatesPerSample = 0.1*15:0.05*15:0.025
+    momentumAsTimeConstant = 0
+    dropoutRate = 0.0
+    gradUpdateType = "None"
+
+#    # settings for Auto Adjust Learning Rate
+#    AutoAdjust = [
+#        autoAdjustLR = "adjustAfterEpoch"
+#        reduceLearnRateIfImproveLessThan = 0
+#        continueReduce = false
+#        increaseLearnRateIfImproveMoreThan = 1000000000
+#        learnRateDecreaseFactor = 0.5
+#        learnRateIncreaseFactor = 1.382
+#        learnRateAdjustInterval = 5
+#    ]
+  ]
+]
+
+test = [
+  action = "eval"
+
+  minibatchSize = 1024
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/quizbowl.test"
+    randomize = "false"
+
+    input = [ 
+      Word = [ 
+        dim = "$inputVocabDim$"
+        format = "sparse"
+      ]
+      Answer = [
+        dim = "$labelDim$"
+        format = "sparse"
+      ]
+    ]
+  ]
+]
