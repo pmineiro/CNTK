@@ -1,3 +1,5 @@
+all: quizbowl.train quizbowl.test quizbowl.dev
+
 quizbowl.train: question_data/questions.csv csv2cntk
 	perl ./csv2cntk train $< > $@
 
