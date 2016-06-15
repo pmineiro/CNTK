@@ -622,13 +622,13 @@ RNNs =
        dim = lstmState.dim
     ]
 
-    GRU (outputDim, x, inputDim=x.dim, prevState) = 
+    GRU (outputDim, x, inputDim=x.dim, prevState, addDropout=false) = 
     [
       _privateInnards = [
          htm1 = prevState.h
          bightm1 = prevState.bigh
          bighDim = prevState.dim
-         dropx = Dropout (x)
+         dropx = if addDropout then Dropout (x) else x
 
          Woh() = Parameters.WeightParam (outputDim, bighDim)
          Woi() = Parameters.WeightParam (outputDim, inputDim)
@@ -650,19 +650,19 @@ RNNs =
 
     RecurrentGRU (outputDim, x, inputDim=x.dim,
                   previousHook=BS.RNNs.GRUPreviousHC,
-                  layerIndex=0) =
+                  layerIndex=0, addDropout=false) =
     [
-        inputDim1 = inputDim ; layerIndex1 = layerIndex # workaround (?)
+        inputDim1 = inputDim ; layerIndex1 = layerIndex; addDropout1 = addDropout 
 
         prevState = previousHook (gruState, layerIndex=layerIndex1) # recurrent memory. E.g. Previous or Next, with or without initial state, beam reordering etc.
 
-        gruState = BS.RNNs.GRU (outputDim, x, inputDim=inputDim1, prevState)
+        gruState = BS.RNNs.GRU (outputDim, x, inputDim=inputDim1, prevState, addDropout=addDropout1)
     ].gruState // that's the value we return
 
     # a stack of recurrent GRUs (bidirectional)
     # TODO: Should we define layerDims as the total (sum of both forward and backward direction)?
-    RecurrentBirectionalGRUStack (layerDims, input, inputDim=input.dim, previousHook=GRUPreviousHC, nextHook=GRUNextHC) = [
-        previousHook1 = previousHook ; nextHook1 = nextHook ; 
+    RecurrentBirectionalGRUStack (layerDims, input, inputDim=input.dim, previousHook=GRUPreviousHC, nextHook=GRUNextHC, addDropout=false) = [
+        previousHook1 = previousHook ; nextHook1 = nextHook ; addDropout1 = addDropout
 
         layers[i:0..Length (layerDims)-1] =
         [
@@ -672,11 +672,11 @@ RNNs =
             fwd = RecurrentGRU (layerDims[i], 
                                   v, inputDim=vDim,
                                   previousHook=previousHook1,
-                                  layerIndex=i)
+                                  layerIndex=i, addDropout=addDropout1)
             bwd = RecurrentGRU (layerDims[i], 
                                   v, inputDim=vDim,
                                   previousHook=nextHook1,
-                                  layerIndex=i)
+                                  layerIndex=i, addDropout=addDropout1)
             h = Splice ((fwd.h : bwd.h), axis=1)
             dim = layerDims[i] * 2  # output dimension
         ]
@@ -684,23 +684,28 @@ RNNs =
 
     # a stack of recurrent GRUs (biresidual)
     # TODO: Should we define layerDims as the total (sum of both forward and backward direction)?
-    RecurrentBiresidualGRUStack (layerDims, input, inputDim=input.dim, previousHook=GRUPreviousHC, nextHook=GRUNextHC) = [
-        previousHook1 = previousHook ; nextHook1 = nextHook ; 
+    RecurrentBiresidualGRUStack (layerDims, input, inputDim=input.dim, previousHook=GRUPreviousHC, nextHook=GRUNextHC, addDropout=false) = [
+        previousHook1 = previousHook ; nextHook1 = nextHook ; addDropout1 = addDropout
 
         layers[i:0..Length (layerDims)-1] =
         [
-            v    = if i == 0 then input    else layers[i-1].h
+            # residual variant of dropout ...
+
+            dropv = if i == 0 then if addDropout then Dropout (input) else input else layers[i-1].h
             vDim = if i == 0 then inputDim else layers[i-1].dim
 
             fwd = RecurrentGRU (layerDims[i], 
-                                v, inputDim=vDim,
+                                dropv, inputDim=vDim,
                                 previousHook=previousHook1,
-                                layerIndex=i)
+                                layerIndex=i, addDropout=false)
             bwd = RecurrentGRU (layerDims[i], 
-                                  v, inputDim=vDim,
-                                  previousHook=nextHook1,
-                                  layerIndex=i)
-            h = fwd.h + bwd.h + v
+                                dropv, inputDim=vDim,
+                                previousHook=nextHook1,
+                                layerIndex=i, addDropout=false)
+
+            dropfh = if addDropout then Dropout (fwd.h) else fwd.h
+            dropbh = if addDropout then Dropout (bwd.h) else bwd.h
+            h = dropfh + dropbh + dropv
             dim = layerDims[i] 
         ]
     ].layers
