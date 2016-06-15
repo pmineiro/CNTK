@@ -1,7 +1,8 @@
 ########################################################################
-# GRU residual learning version of experiment 3, 1 layer
+# GRU residual learning version of experiment 3
 # 
-# dropout 0.5: 2.5% / 34.6% train / dev error
+# 1 layer, 60 dim, dropout 0.5: 2.5% / 34.6% train / dev error
+# 1 layer, 50 dim, dropout 0.5: ???
 #
 ########################################################################
 
@@ -12,15 +13,15 @@ OutDir     = "$RunRootDir$/Out"
 command = train
 
 deviceId = auto 
-ExpId = quizbowl-8d
+ExpId = quizbowl-8dd
 
 modelPath  = "$OutDir$/$ExpId$/QuizBowl.dnn"
 stderr     = "$OutDir$/$ExpId$/QuizBowl"
 
 inputVocabDim = 26665
 labelDim = 2370
-hiddenDim = 60
-embeddingDim = 60
+hiddenDim = 50
+embeddingDim = 50
 maxLayer = 1
 
 #---------------------------
@@ -106,7 +107,7 @@ train = [
     keepCheckPointFiles = "false"
     maxEpochs = 200
     minibatchSize = 128
-    learningRatesPerSample = 0.05*15:0.01
+    learningRatesPerSample = 0.05*15:0.01*50:0.005
     momentumAsTimeConstant = 0
     dropoutRate = 0.5
     gradUpdateType = "None"
