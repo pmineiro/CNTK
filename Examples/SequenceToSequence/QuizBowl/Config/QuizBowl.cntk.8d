@@ -2,7 +2,7 @@
 # GRU residual learning version of experiment 3
 # 
 # 1 layer, 60 dim, dropout 0.5: 2.5% / 34.6% train / dev error
-# 1 layer, 50 dim, dropout 0.5: ???
+# 1 layer, 60 dim, residual dropout 0.5: 4.1% / 33.4% train / dev error
 #
 ########################################################################
 
@@ -20,8 +20,8 @@ stderr     = "$OutDir$/$ExpId$/QuizBowl"
 
 inputVocabDim = 26665
 labelDim = 2370
-hiddenDim = 50
-embeddingDim = 50
+hiddenDim = 60
+embeddingDim = 60
 maxLayer = 1
 
 #---------------------------
@@ -44,7 +44,7 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
   
   Einput = BS.Parameters.WeightParam ($inputVocabDim$, embeddingDim)
   inputEmbedded = TransposeTimes (Einput, Word)
-  net = BS.RNNs.RecurrentBiresidualGRUStack (netDims, inputEmbedded, inputDim=embeddingDim)
+  net = BS.RNNs.RecurrentBiresidualGRUStack (netDims, inputEmbedded, inputDim=embeddingDim, addDropout=true)
   netOutput = Dropout (net[Length (netDims) - 1].h)
   avgNetOutput = [
     mysum = netOutput + PastValue (0, mysum, defaultHiddenActivation=0)
