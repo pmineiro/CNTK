@@ -628,6 +628,7 @@ RNNs =
          htm1 = prevState.h
          bightm1 = prevState.bigh
          bighDim = prevState.dim
+         dropx = Dropout (x)
 
          Woh() = Parameters.WeightParam (outputDim, bighDim)
          Woi() = Parameters.WeightParam (outputDim, inputDim)
@@ -636,9 +637,9 @@ RNNs =
          Whi() = Parameters.WeightParam (bighDim, inputDim)
          Bh () = Parameters.BiasParam (bighDim)
 
-         z = Sigmoid (Woh () * bightm1 + Woi () * x + Bo ())
-         r = Sigmoid (Whh () * bightm1 + Whi () * x + Bh ())
-         htilde = Tanh (Woh () * (r .* bightm1) + Woi () * x + Bo ())
+         z = Sigmoid (Woh () * bightm1 + Woi () * dropx + Bo ())
+         r = Sigmoid (Whh () * bightm1 + Whi () * dropx + Bh ())
+         htilde = Tanh (Woh () * (r .* bightm1) + Woi () * dropx + Bo ())
 
          ht = (Constant (1) - z) .* htm1 + z .* htilde
       ]
