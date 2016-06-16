@@ -2,7 +2,8 @@
 # GRU residual learning version of experiment 3
 # 
 # 1 layer, 60 dim, dropout 0.5: 2.5% / 34.6% train / dev error
-# 1 layer, 60 dim, residual dropout 0.5: 4.1% / 33.4% train / dev error
+# 1 layer, 60 dim, residual dropout 0.5: 3.1% / 31.8% train / dev error
+# 1 layer, 160 dim, residual dropout 0.5: 2.4% / 30.0% train / dev error
 #
 ########################################################################
 
@@ -20,8 +21,8 @@ stderr     = "$OutDir$/$ExpId$/QuizBowl"
 
 inputVocabDim = 26665
 labelDim = 2370
-hiddenDim = 60
-embeddingDim = 60
+hiddenDim = 160
+embeddingDim = 160
 maxLayer = 1
 
 #---------------------------
@@ -107,7 +108,7 @@ train = [
     keepCheckPointFiles = "false"
     maxEpochs = 200
     minibatchSize = 128
-    learningRatesPerSample = 0.05*15:0.01*50:0.005
+    learningRatesPerSample = 0.05*15:0.01*50:0.005*50:0.001
     momentumAsTimeConstant = 0
     dropoutRate = 0.5
     gradUpdateType = "None"
