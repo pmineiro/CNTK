@@ -3,6 +3,7 @@
 # 
 # 1 layer, 60 dim, dropout 0.5: 2.5% / 34.6% train / dev error
 # 1 layer, 60 dim, residual dropout 0.5: 3.1% / 31.8% train / dev error
+# 1 layer, 80 dim, residual dropout 0.5: 2.9% / 31.6% train / dev error
 # 1 layer, 160 dim, residual dropout 0.5: 2.4% / 30.0% train / dev error
 #
 ########################################################################
