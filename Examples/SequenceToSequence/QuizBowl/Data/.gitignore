@@ -1,5 +1,5 @@
-label
-vocab
+label*
+vocab*
 question_data/
 question_data.tar.gz
 quizbowl.*

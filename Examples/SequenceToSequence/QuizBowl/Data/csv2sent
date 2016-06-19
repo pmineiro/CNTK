@@ -1,0 +1,31 @@
+#! /usr/bin/env perl
+
+use warnings;
+use strict;
+
+# Question ID,Fold,Answer,Category,Text
+# 3009,train,Henry IV of France,History,"With the assistence of his chief minister, the Duc de Sully, he lowered taxes on peasantry, promoted economic recovery, and instituted a tax on the Paulette. ||| Victor at Ivry and Arquet, he was excluded from succession by the Treaty of Nemours, but won a great victory at Coutras. ||| His excommunication was lifted by Clement VIII, but that pope later claimed to be crucified when this monarch promulgated the Edict of Nantes. ||| For 10 points, name this French king, the first Bourbon who admitted that ""Paris is worth a mass"" when he converted following the War of the Three Henrys."
+
+#-------------------------
+
+my $header = <>; 
+
+my $skip = 0;
+while (defined ($_ = <>))
+  {
+    s/\r\n/\n/g;
+    chomp;
+    my ($qid, $fold, $answer, $category, $text) = split /,/, $_, 5;
+
+#    next unless $category eq "History";
+
+    do { ++$skip; next } unless $text =~ /\|\|\|/;
+    my @clues = split /\|\|\|/, $text;
+    $text = $clues[-1];
+    my @sentences = split /\./, $text;
+    do { ++$skip; next } if @sentences > 2;
+
+    print "$text\n";
+  }
+
+warn "$skip";

@@ -67,6 +67,7 @@ my $sid = 0;
 my $skip = 0;
 while (defined ($_ = <>))
   {
+    s/\r\n/\n/g;
     chomp;
     my ($qid, $fold, $answer, $category, $text) = split /,/, $_, 5;
 

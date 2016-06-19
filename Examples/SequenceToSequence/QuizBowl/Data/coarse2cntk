@@ -1,0 +1,118 @@
+#! /usr/bin/env perl
+
+use warnings;
+use strict;
+
+use IO::File;
+
+sub save_hash ($$)
+{
+  my ($filename, $hash) = @_;
+  my $fh = new IO::File $filename, "w" or die "$filename: $!";
+
+  while (my ($k, $v) = each %$hash)
+    {
+      print $fh "$k\t$v\n";
+    }
+}
+
+sub load_hash ($$)
+{
+  my ($filename, $hash) = @_;
+  my $fh = new IO::File $filename, "r" or die "$filename: $!";
+
+  while (defined ($_ = <$fh>))
+    {
+      chomp;
+      my ($k, $v) = split /\t/, $_, 2;
+
+      $hash->{$k} = $v;
+    }
+}
+
+my $mode = shift @ARGV or die;
+$mode eq "train" || $mode eq "test" || $mode eq "dev" or die "bad mode $mode";
+my $vocabzerofile = "vocabzero";
+my $labelfile = "label0";
+my $vocabonefile = "vocabone";
+
+my $zerofh = new IO::File "quizbowl.coarse.0", "r" or die $!;
+my $onefh = new IO::File "quizbowl.coarse.1", "r" or die $!;
+
+my %vocabzero;
+my %vocabone;
+my %label;
+
+sub encode ($$)
+  {
+    my ($v, $dict) = @_;
+
+    if ($mode eq "train")
+      {
+	$dict->{$v} ||= scalar keys %$dict;
+      }
+
+    return $dict->{$v};
+  }
+
+if ($mode eq "test" || $mode eq "dev")
+  {
+    load_hash ($vocabzerofile, \%vocabzero);
+    load_hash ($vocabonefile, \%vocabone);
+    load_hash ($labelfile, \%label);
+  }
+
+#-------------------------
+
+my $header = <>; 
+
+my $sid = 0;
+my $skip = 0;
+my $mismatch = 0;
+while (defined ($_ = <>))
+  {
+    s/\r\n/\n/g;
+    chomp;
+    my ($qid, $fold, $answer, $category, $text) = split /,/, $_, 5;
+
+    do { ++$skip; next } unless $text =~ /\|\|\|/;
+    my @clues = split /\|\|\|/, $text;
+    $text = $clues[-1];
+    my @sentences = split /\./, $text;
+    do { ++$skip; next } if @sentences > 2;
+
+    my $zero = <$zerofh>; defined $zero or last;
+    my $one = <$onefh>; defined $one or last;
+
+    my @zerotokens = split /\s+/, $zero;
+    my @onetokens = split /\s+/, $one;
+
+    ++$mismatch if scalar @zerotokens != scalar @onetokens;
+
+    my $encans = encode ($answer, \%label) or die "unknown answer $answer";
+    $encans = " |Answer ${encans}:1";
+
+    while (@zerotokens && @onetokens)
+      {
+        my $zerotoken = shift @zerotokens;
+        my $onetoken = shift @onetokens;
+
+        my $enczerotok = encode ($zerotoken, \%vocabzero) or die "unknown 0-token $zerotoken";
+        my $enconetok = encode ($onetoken, \%vocabone) or die "unknown 1-token $onetoken";
+
+        print "$sid |Zero ${enczerotok}:1 |One ${enconetok}:1$encans\n" if $fold eq $mode;
+
+        $encans="";
+      }
+
+    ++$sid;
+  }
+
+if ($mode eq "train")
+  {
+    save_hash ($vocabzerofile, \%vocabzero);
+    save_hash ($vocabonefile, \%vocabone);
+    save_hash ($labelfile, \%label);
+  }
+
+warn "$mode $skip $mismatch $sid";

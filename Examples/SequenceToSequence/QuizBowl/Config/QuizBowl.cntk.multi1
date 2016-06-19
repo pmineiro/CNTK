@@ -1,0 +1,193 @@
+########################################################################
+# GRU residual learning version of experiment 3
+# 
+# 1 layer, 60 dim, dropout 0.5: 2.5% / 34.6% train / dev error
+# 1 layer, 60 dim, residual dropout 0.5: 3.1% / 31.8% train / dev error
+# 1 layer, 80 dim, residual dropout 0.5: 2.9% / 31.6% train / dev error
+# 1 layer, 160 dim, residual dropout 0.5: 2.4% / 30.0% train / dev error
+#
+########################################################################
+
+RunRootDir = ".."      # default if not overridden
+DataDir    = "$RunRootDir$/Data"
+OutDir     = "$RunRootDir$/Out"
+
+command = train
+
+deviceId = auto 
+ExpId = quizbowl-multi1
+
+modelPath  = "$OutDir$/$ExpId$/QuizBowl.dnn"
+stderr     = "$OutDir$/$ExpId$/QuizBowl"
+
+inputVocabDim = 26400
+outputVocabDim = 26400
+labelDim = 2365
+hiddenDim = 60
+embeddingDim = 60
+maxLayer = 1
+
+#  26665 ../Data/vocab
+#  26400 ../Data/vocabone
+#  26400 ../Data/vocabzero
+#   2370 ../Data/label
+#   2365 ../Data/label0
+#  84200 total
+
+#---------------------------
+# network
+#---------------------------
+
+BrainScriptNetworkBuilder = (new ComputationNetwork [
+  inputVocabDim = $inputVocabDim$
+  outputVocabDim = $outputVocabDim$
+  labelDim = $labelDim$
+  hiddenDim = $hiddenDim$
+  embeddingDim = $embeddingDim$
+  precision = "float"
+  maxLayer = $maxLayer$
+  
+  netDims[i:0..maxLayer] = hiddenDim
+
+  inputAxis = DynamicAxis()
+  Zero = Input (inputVocabDim, dynamicAxis=inputAxis, tag='feature')
+  One = Input (outputVocabDim, dynamicAxis=inputAxis)
+  Answer = Input (labelDim, tag='label')
+  
+  Einput = BS.Parameters.WeightParam ($inputVocabDim$, embeddingDim)
+  inputEmbedded = TransposeTimes (Einput, Zero)
+  net = BS.RNNs.RecurrentBiresidualGRUStack (netDims, inputEmbedded, inputDim=embeddingDim, addDropout=true)
+  rawnetOutput = net[Length (netDims) - 1].h
+  netOutput = Dropout (rawnetOutput)
+  doTheSum (in) = [
+    mysum = in + PastValue (0, mysum, defaultHiddenActivation=0)
+    mycount = BS.Constants.OnesLike (in) + PastValue (0, mycount, defaultHiddenActivation=0)
+    myavg = ElementDivide (mysum, mycount)
+  ]
+
+  avgNetOutput = doTheSum (netOutput)
+  lastAvgNetOutput = BS.Sequences.Last (avgNetOutput.myavg)
+
+  wOutput = BS.Parameters.WeightParam (net[Length (netDims) - 1].dim, $labelDim$)
+  bOutput = BS.Parameters.BiasParam ($labelDim$)
+  prePreSoftMax = TransposeTimes (wOutput, lastAvgNetOutput) 
+  preSoftMax = prePreSoftMax + bOutput
+  recPreSoftMax = ReconcileDynamicAxis (preSoftMax, Answer)
+  ce = CrossEntropyWithSoftmax (Answer, recPreSoftMax)
+  errs = ErrorPrediction (Answer, recPreSoftMax, tag='evaluation')
+
+#  criterionNodes = (ce)
+
+  wExtra = BS.Parameters.WeightParam (net[Length (netDims) - 1].dim, $outputVocabDim$)
+  bExtra = BS.Parameters.BiasParam ($outputVocabDim$)
+  prepreExtraSoftMax = TransposeTimes (wExtra, rawnetOutput) 
+  preExtraSoftMax = prepreExtraSoftMax + bExtra
+  ceExtra = ElementDivide (CrossEntropyWithSoftmax (One, preExtraSoftMax), BS.Sequences.Last (avgNetOutput.mycount))
+
+#  megaLoss = BS.Constant (0.5) .* (ce + BS.Constant (0) .* ceExtra)
+#  megaLoss = (BS.Constant (1) .* ce) + (BS.Constant (0) .* ceExtra)
+  megaLoss = ce
+
+  criterionNodes = (megaLoss)
+  evaluationNodes = (ce:ceExtra)
+])
+
+train = [
+  action = "train"
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/quizbowl.multi.train"
+    randomize = "true"
+
+    input = [ 
+      Zero = [ 
+        dim = "$inputVocabDim$"
+        format = "sparse"
+      ]
+      One = [ 
+        dim = "$outputVocabDim$"
+        format = "sparse"
+      ]
+      Answer = [
+        dim = "$labelDim$"
+        format = "sparse"
+      ]
+    ]
+  ]
+
+  cvReader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/quizbowl.multi.dev"
+    randomize = "false"
+
+    input = [ 
+      Zero = [ 
+        dim = "$inputVocabDim$"
+        format = "sparse"
+      ]
+      One = [ 
+        dim = "$outputVocabDim$"
+        format = "sparse"
+      ]
+      Answer = [
+        dim = "$labelDim$"
+        format = "sparse"
+      ]
+    ]
+  ]
+
+  SGD = [ 
+    modelPath = "$modelPath$"
+    epochSize = 0
+    keepCheckPointFiles = "false"
+    maxEpochs = 200
+    minibatchSize = 128
+    learningRatesPerSample = 0.05*15:0.01*50:0.005*50:0.001
+    momentumAsTimeConstant = 0
+    dropoutRate = 0.5
+    gradUpdateType = "None"
+
+#    # settings for Auto Adjust Learning Rate
+#    AutoAdjust = [
+#        autoAdjustLR = "adjustAfterEpoch"
+#        reduceLearnRateIfImproveLessThan = 0
+#        continueReduce = false
+#        increaseLearnRateIfImproveMoreThan = 1000000000
+#        learnRateDecreaseFactor = 0.5
+#        learnRateIncreaseFactor = 1.382
+#        learnRateAdjustInterval = 1
+#    ]
+  ]
+]
+
+test = [
+  action = "eval"
+
+  minibatchSize = 1024
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/quizbowl.multi.test"
+    randomize = "false"
+
+    input = [ 
+      Zero = [ 
+        dim = "$inputVocabDim$"
+        format = "sparse"
+      ]
+      One = [ 
+        dim = "$outputVocabDim$"
+        format = "sparse"
+      ]
+      Answer = [
+        dim = "$labelDim$"
+        format = "sparse"
+      ]
+    ]
+  ]
+]
