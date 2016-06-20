@@ -15,7 +15,7 @@ OutDir     = "$RunRootDir$/Out"
 command = train
 
 deviceId = auto 
-ExpId = quizbowl-multi3
+ExpId = quizbowl-multi9
 
 modelPath  = "$OutDir$/$ExpId$/QuizBowl.dnn"
 stderr     = "$OutDir$/$ExpId$/QuizBowl"
@@ -78,7 +78,7 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
   preExtraSoftMax = prepreExtraSoftMax + bExtra
   ceExtra = ElementDivide (CrossEntropyWithSoftmax (One, preExtraSoftMax), BS.Sequences.Last (avgNetOutput.mycount))
 
-	megaLoss = Pass (BS.Constant (0.1) * (ce + BS.Constant (0.2) * ceExtra), tag='criterion')
+	megaLoss = Pass (BS.Constant (0.1) * (BS.Constant (0.1) * ce + ceExtra), tag='criterion')
 
   evaluationNodes = (ce:ceExtra:errs)
 ])

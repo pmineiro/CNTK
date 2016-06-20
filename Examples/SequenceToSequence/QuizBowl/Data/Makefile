@@ -1,3 +1,5 @@
+.SECONDARY:
+
 SCRIPTDIR:=$(HOME)/src/msr_intern2016/scripts/
 MYDIR=$(shell pwd)
 
