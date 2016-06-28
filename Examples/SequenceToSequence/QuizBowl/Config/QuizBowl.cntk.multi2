@@ -15,17 +15,34 @@ OutDir     = "$RunRootDir$/Out"
 command = train
 
 deviceId = auto 
-ExpId = quizbowl-multi9
+ExpId = quizbowl-multi2
 
 modelPath  = "$OutDir$/$ExpId$/QuizBowl.dnn"
 stderr     = "$OutDir$/$ExpId$/QuizBowl"
 
 inputVocabDim = 26393
-outputVocabDim = 18111
+outputVocabDim = 7881
 labelDim = 2365
 hiddenDim = 160
 embeddingDim = 160
 maxLayer = 1
+
+# 26665 ../Data/vocab
+#  7881 ../Data/vocabone
+# 26393 ../Data/vocabzero
+#  2370 ../Data/label
+#  2365 ../Data/label0
+# 65674 total
+
+# 12244 ../Data/vocabone
+# 26393 ../Data/vocabzero
+#  2365 ../Data/label0
+# 41002 total
+
+# 15608 ../Data/vocabone
+# 26393 ../Data/vocabzero
+#  2365 ../Data/label0
+# 44366 total
 
 # 18111 ../Data/vocabone
 # 26393 ../Data/vocabzero
@@ -78,7 +95,7 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
   preExtraSoftMax = prepreExtraSoftMax + bExtra
   ceExtra = ElementDivide (CrossEntropyWithSoftmax (One, preExtraSoftMax), BS.Sequences.Last (avgNetOutput.mycount))
 
-	megaLoss = Pass (BS.Constant (0.1) * (BS.Constant (0.1) * ce + ceExtra), tag='criterion')
+  megaLoss = Pass (BS.Constant (0.1) * (ce + BS.Constant (0.05) * ceExtra), tag='criterion')
 
   evaluationNodes = (ce:ceExtra:errs)
 ])

@@ -1,0 +1,139 @@
+#! /usr/bin/env perl
+
+use warnings;
+use strict;
+
+use Text::CSV;
+
+sub save_hash ($$)
+{
+  my ($filename, $hash) = @_;
+  my $fh = new IO::File $filename, "w" or die "$filename: $!";
+  $fh->binmode (":utf8");
+
+  while (my ($k, $v) = each %$hash)
+    {
+      print $fh "$k\t$v\n";
+    }
+}
+
+sub load_hash ($$)
+{
+  my ($filename, $hash) = @_;
+  my $fh = new IO::File $filename, "r" or die "$filename: $!";
+
+  while (defined ($_ = <$fh>))
+    {
+      chomp;
+      my ($k, $v) = split /\t/, $_, 2;
+
+      $hash->{$k} = $v;
+    }
+}
+
+my $oov = 0;
+
+sub encode ($$)
+{
+  my ($v, $dict) = @_;
+
+  $dict->{$v} ||= do { ++$oov; scalar keys %$dict; };
+
+  return $dict->{$v};
+}
+
+my $mode = shift @ARGV or die;
+$mode eq "train" || $mode eq "test" || $mode eq "valid" or die "bad mode $mode";
+my $vocabfile = "vocab";
+
+my %vocab;
+
+if ($mode eq "test" || $mode eq "valid")
+  {
+    load_hash ($vocabfile, \%vocab);
+  }
+
+my $csv = Text::CSV->new ({ binary => 1 }) or die Text::CSV->error_diag ();
+
+# i think we could import the old comments via rsync, but from there we need to go via email. I think it is easier than caching the status on each bug and than import bits here and there __eou__ __eot__ it would be very easy to keep a hash db of message-ids  __eou__ sounds good __eou__ __eot__ ok __eou__ perhaps we can ship an ad-hoc apt_prefereces __eou__ __eot__ version? __eou__ __eot__ thanks __eou__ __eot__ not yet __eou__ it is covered by your insurance? __eou__ __eot__ yes __eou__ but it's really not the right time :/ __eou__ with a changing house upcoming in 3 weeks __eou__ __eot__ you will be moving into your house soon? __eou__ posted a message recently which explains what to do if the autoconfiguration does not do what you expect __eou__ __eot__ how urgent is #896? __eou__ __eot__ not particularly urgent, but a policy violation __eou__ __eot__ i agree that we should kill the -novtswitch __eou__ __eot__ ok __eou__ __eot__ would you consider a package split a feature? __eou__ __eot__ context? __eou__ __eot__ splitting xfonts* out of xfree86*. one upload for the rest of the life and that's it __eou__ __eot__ splitting the source package you mean? __eou__ __eot__ yes. same binary packages. __eou__ __eot__ I would prefer to avoid it at this stage.  this is something that has gone into XSF svn, I assume? __eou__ __eot__  at ./ubuntu2trainv1 line 17, <> line 2.
+# basically each xfree86 upload will NOT force users to upgrade 100Mb of fonts for nothing __eou__ no something i did in my spare time. __eou__ at ./ubuntu2trainv1 line 18, <> line 2.
+# 1.0 at ./ubuntu2trainv1 line 19, <> line 2.
+
+# eat header
+<>;
+
+my $sid = 1;
+my $skip = 0;
+my $maxsid = $mode eq "train" ? 10000 : 1000;
+
+while (my $row = $csv->getline (*ARGV))
+  {
+    my @fields = @$row;
+
+    # too bad punct includes '*'
+
+    $fields[0] =~ s/([[:punct:]]+)\s/ $1 /g;
+    $fields[0] =~ s/\s([[:punct:]]+)/ $1 /g;
+    $fields[1] =~ s/([[:punct:]]+)\s/ $1 /g;
+    $fields[1] =~ s/\s([[:punct:]]+)/ $1 /g;
+
+    my @context = split /\s+/, $fields[0];
+
+    if ($mode eq "train")
+      {
+        do { ++$skip; next } unless $fields[2] eq "1.0" || $fields[2] eq "0.0";
+
+        my @query = split /\s+/, $fields[1];
+        my @label = ( ($fields[2] > 0.5) ? 1 : 0 );
+
+        while (@context || @query || @label)
+          {
+            my $ct = @context ? "@{[encode (shift @context, \%vocab)]}:1" : "";
+            my $qt = @query ? "@{[encode (shift @query, \%vocab)]}:1" : "";
+            my $multilabel = @label ? ($label[0] == 1 ? "|MultiLabel 0 1" : "|MultiLabel 1 0") : "";
+            my $label = @label ? "|Label @{[shift @label]}" : "";
+
+            print "$sid |Context $ct |Query $qt $label $multilabel\n";
+          }
+      }
+    else
+      {
+        $fields[2] =~ s/([[:punct:]]+)\s/ $1 /g;
+        $fields[2] =~ s/\s([[:punct:]]+)/ $1 /g;
+    
+        my @goodcontext = @context;
+        my @goodquery = split /\s+/, $fields[1];
+        my @goodlabel = (1);
+        my @badcontext = @context;
+        my @badquery = split /\s+/, $fields[1];
+        my @badlabel = (0);
+
+        while (@goodcontext || @goodquery || @goodlabel)
+          {
+            my $ct = @goodcontext ? "@{[encode (shift @goodcontext, \%vocab)]}:1" : "";
+            my $qt = @goodquery ? "@{[encode (shift @goodquery, \%vocab)]}:1" : "";
+            my $multilabel = @goodlabel ? ($goodlabel[0] == 1 ? "|MultiLabel 0 1" : "|MultiLabel 1 0") : "";
+            my $label = @goodlabel ? "|Label @{[shift @goodlabel]}" : "";
+
+            print "$sid |Context $ct |Query $qt $label $multilabel\n";
+          }
+
+        ++$sid;
+
+        while (@badcontext || @badquery || @badlabel)
+          {
+            my $ct = @badcontext ? "@{[encode (shift @badcontext, \%vocab)]}:1" : "";
+            my $qt = @badquery ? "@{[encode (shift @badquery, \%vocab)]}:1" : "";
+            my $multilabel = @badlabel ? ($badlabel[0] == 1 ? "|MultiLabel 0 1" : "|MultiLabel 1 0") : "";
+            my $label = @badlabel ? "|Label @{[shift @badlabel]}" : "";
+
+            print "$sid |Context $ct |Query $qt $label $multilabel\n";
+          }
+      }
+
+    last if ++$sid > $maxsid;
+  }
+
+save_hash ($vocabfile, \%vocab);
+
+warn join "\t", $oov, $skip;

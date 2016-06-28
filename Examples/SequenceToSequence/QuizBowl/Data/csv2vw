@@ -1,0 +1,97 @@
+#! /usr/bin/env perl
+
+use warnings;
+use strict;
+
+use IO::File;
+
+sub save_hash ($$)
+{
+  my ($filename, $hash) = @_;
+  my $fh = new IO::File $filename, "w" or die "$filename: $!";
+
+  while (my ($k, $v) = each %$hash)
+    {
+      print $fh "$k\t$v\n";
+    }
+}
+
+sub load_hash ($$)
+{
+  my ($filename, $hash) = @_;
+  my $fh = new IO::File $filename, "r" or die "$filename: $!";
+
+  while (defined ($_ = <$fh>))
+    {
+      chomp;
+      my ($k, $v) = split /\t/, $_, 2;
+
+      $hash->{$k} = $v;
+    }
+}
+
+# Question ID,Fold,Answer,Category,Text
+# 3009,train,Henry IV of France,History,"With the assistence of his chief minister, the Duc de Sully, he lowered taxes on peasantry, promoted economic recovery, and instituted a tax on the Paulette. ||| Victor at Ivry and Arquet, he was excluded from succession by the Treaty of Nemours, but won a great victory at Coutras. ||| His excommunication was lifted by Clement VIII, but that pope later claimed to be crucified when this monarch promulgated the Edict of Nantes. ||| For 10 points, name this French king, the first Bourbon who admitted that ""Paris is worth a mass"" when he converted following the War of the Three Henrys."
+
+my $mode = shift @ARGV or die;
+$mode eq "train" || $mode eq "test" || $mode eq "dev" or die "bad mode $mode";
+my $labelfile = "vwlabel";
+
+my %label;
+
+sub encode ($$)
+  {
+    my ($v, $dict) = @_;
+
+    if ($mode eq "train")
+      {
+	$dict->{$v} ||= scalar keys %$dict;
+      }
+
+    return $dict->{$v};
+  }
+
+if ($mode eq "test" || $mode eq "dev")
+  {
+    load_hash ($labelfile, \%label);
+  }
+
+#-------------------------
+
+my $header = <>; 
+
+my $skip = 0;
+while (defined ($_ = <>))
+  {
+    local $\="\n";
+    s/\r\n/\n/g;
+    chomp;
+    my ($qid, $fold, $answer, $category, $text) = split /,/, $_, 5;
+
+#    next unless $category eq "History";
+
+    my $encans = encode ($answer, \%label) or die "unknown answer $answer";
+
+    next unless $fold eq $mode;
+
+    do { ++$skip; next } unless $text =~ /\|\|\|/;
+    $text =~ s/^"//; $text =~ s/"$//; 
+    my @clues = split /\|\|\|/, $text;
+    $text = join " ", @clues;
+    $text =~ s/""/"/g; $text =~ s/([[:punct:]])/ $1 /g;
+
+    my @tokens = map { s/[\|:]/_/g; $_ } split /\s+/, $text;
+    my %tc; foreach (@tokens) { ++$tc{$_}; };
+    #my $total; foreach (keys %tc) { $total += $tc{$_}; }
+    #my %hell = map { $_ => sqrt ($tc{$_}) / ($total * $tc{$_}) } keys %tc;
+    my %logtf = map { $_ => (log (1.0 + $tc{$_}) / ($tc{$_} * log (2.0))) } keys %tc;
+
+    print "$encans |w ", (join " ", map { "$_:$logtf{$_}" } @tokens)
+  }
+
+if ($mode eq "train")
+  {
+    save_hash ($labelfile, \%label);
+  }
+
+warn "$mode $skip";

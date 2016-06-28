@@ -1,9 +1,22 @@
+SHELL=/bin/zsh
 .SECONDARY:
 
 SCRIPTDIR:=$(HOME)/src/msr_intern2016/scripts/
 MYDIR=$(shell pwd)
 
 all: quizbowl.train quizbowl.test quizbowl.dev
+
+vwquizbowl.train: question_data/questions.csv csv2vw
+	perl ./csv2vw train $< > $@
+
+vwquizbowl.%: question_data/questions.csv csv2vw
+	perl ./csv2vw $* $< > $@
+
+vwmodel: vwquizbowl.train
+	vw -b 28 --oaa $$(cat vwlabel | wc -l) --ngram 3 -f $@ -d =(shuf vwquizbowl.train) --passes 10 -c
+
+vwdev: vwmodel vwquizbowl.dev
+	vw -i $< -d $(word 2,$^)
 
 quizbowl.sent: question_data/questions.csv csv2sent
 	perl ./csv2sent $< > $@

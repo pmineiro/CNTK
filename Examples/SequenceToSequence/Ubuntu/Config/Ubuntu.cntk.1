@@ -1,0 +1,156 @@
+########################################################################
+# DSSM with Residual GRU 
+# 
+# no attention
+# no tying of query and context GRU parameters (but embedding is tied)
+#
+########################################################################
+
+RunRootDir = ".."      # default if not overridden
+DataDir    = "$RunRootDir$/Data"
+OutDir     = "$RunRootDir$/Out"
+
+command = train
+
+deviceId = auto 
+ExpId = ubuntu-1
+
+modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
+stderr     = "$OutDir$/$ExpId$/Ubuntu"
+
+vocabDim = 45214
+hiddenDim = 160
+embeddingDim = 160
+maxLayer = 1
+
+globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Query = [ dim = "$vocabDim$"; format = "sparse" ]; Label = [ dim = 1; format = "dense" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
+
+#---------------------------
+# network
+#---------------------------
+
+BrainScriptNetworkBuilder = (new ComputationNetwork [
+  vocabDim = $vocabDim$
+  hiddenDim = $hiddenDim$
+  embeddingDim = $embeddingDim$
+  precision = "float"
+  maxLayer = $maxLayer$
+  
+  netDims[i:0..maxLayer] = hiddenDim
+
+  contextAxis = DynamicAxis ();
+  Context = Input (vocabDim, dynamicAxis=contextAxis, tag='feature')
+  queryAxis = DynamicAxis ()
+  Query = Input (vocabDim, dynamicAxis=queryAxis, tag='feature')
+  Label = Input (1, tag='label')
+  MultiLabel = Input (2, tag='label')
+
+  # "averaging" network
+
+  avgNet (in) = [
+    mysum = in + PastValue (0, mysum, defaultHiddenActivation=0)
+    mycount = BS.Constants.OnesLike (in) + PastValue (0, mycount, defaultHiddenActivation=0)
+    myavg = ElementDivide (mysum, mycount)
+  ].myavg
+
+  # embedding
+  
+  Einput = BS.Parameters.WeightParam ($vocabDim$, embeddingDim)
+
+  # context GRU
+
+  contextEmbedded = TransposeTimes (Einput, Context)
+  contextNet = BS.RNNs.RecurrentBiresidualGRUStack (netDims, contextEmbedded, inputDim=embeddingDim, addDropout=true)
+  contextOutput = Dropout (contextNet[Length (netDims) - 1].h)
+  avgContextNetOutput = avgNet (contextOutput)
+  lastAvgContextNetOutput = BS.Sequences.Last (avgContextNetOutput)
+
+  # query GRU
+
+  queryEmbedded = TransposeTimes (Einput, Query)
+  queryNet = BS.RNNs.RecurrentBiresidualGRUStack (netDims, queryEmbedded, inputDim=embeddingDim, addDropout=true)
+  queryOutput = Dropout (queryNet[Length (netDims) - 1].h)
+  avgQueryNetOutput = avgNet (queryOutput)
+  preLastAvgQueryNetOutput = BS.Sequences.Last (avgQueryNetOutput)
+  lastAvgQueryNetOutput = ReconcileDynamicAxis (preLastAvgQueryNetOutput, lastAvgContextNetOutput)
+
+  # inner product similarity
+
+  simMetric = BS.Parameters.WeightParam (hiddenDim, hiddenDim)
+  # simBias = 0
+  similarityQuad = FlattenDimensions (TransposeTimes (TransposeTimes (simMetric, lastAvgContextNetOutput), lastAvgQueryNetOutput), 1, 2)
+
+  # loss function
+  
+  comboScore = Splice ( ( similarityQuad : BS.Constants.ZeroesLike (similarityQuad) ), axis=1)
+  recCombo = ReconcileDynamicAxis (comboScore, MultiLabel)
+  ce = CrossEntropyWithSoftmax (MultiLabel, recCombo, tag='criterion')
+  errs = ErrorPrediction (MultiLabel, recCombo, tag='evaluation')
+
+#  p = Sigmoid (similarityQuad)
+#  recP = ReconcileDynamicAxis (p, Label)
+#  lr = Logistic (Label, recP, tag='criterion')
+#  errs = SquareError (Label, recP, tag='evaluation')
+])
+
+train = [
+  action = "train"
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/ubuntu.train"
+    randomize = "true"
+
+    input = $globalInput$
+  ]
+
+  cvReader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/ubuntu.valid"
+    randomize = "false"
+
+    input = $globalInput$
+  ]
+
+  SGD = [ 
+    modelPath = "$modelPath$"
+    epochSize = 0
+    keepCheckPointFiles = "false"
+    maxEpochs = 200
+    minibatchSize = 128
+    learningRatesPerSample = 0.005*15:0.001*50:0.0005*50:0.0001
+    momentumAsTimeConstant = 0
+    dropoutRate = 0.5
+    gradUpdateType = "None"
+
+#    # settings for Auto Adjust Learning Rate
+#    AutoAdjust = [
+#        autoAdjustLR = "adjustAfterEpoch"
+#        reduceLearnRateIfImproveLessThan = 0
+#        continueReduce = false
+#        increaseLearnRateIfImproveMoreThan = 1000000000
+#        learnRateDecreaseFactor = 0.5
+#        learnRateIncreaseFactor = 1.382
+#        learnRateAdjustInterval = 5
+#    ]
+  ]
+]
+
+# TODO: this can only test accuracy with 1 distractor
+test = [
+  action = "eval"
+
+  minibatchSize = 1024
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/ubuntu.test"
+    randomize = "false"
+
+    input = $globalInput$
+  ]
+]
