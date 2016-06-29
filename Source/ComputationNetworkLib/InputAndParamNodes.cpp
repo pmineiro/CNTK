@@ -44,6 +44,11 @@ LearnableParameter<ElemType>::LearnableParameter(const ScriptableObjects::IConfi
     wstring initString = configp->Get(L"init");
     if (initString == L"fixedValue")
         Value().SetValue((ElemType) configp->Get(L"value"));
+    else if (initString == L"identity")
+    {
+        Value().SetValue((ElemType) 0);
+        Value().SetDiagonalValue((ElemType) 1);
+    }
     else if (initString == L"uniform" || initString == L"gaussian")
     {
         // TODO: add these options also to old NDL
@@ -68,7 +73,7 @@ LearnableParameter<ElemType>::LearnableParameter(const ScriptableObjects::IConfi
         InitFromArray(array, numRows, numCols);
     }
     else
-        RuntimeError("init must be one of the values of [ uniform | gaussian | fixedValue | fromFile ]");
+        RuntimeError("init must be one of the values of [ uniform | gaussian | fixedValue | fromFile | identity ]");
 }
 
 // initialize with random numbers
