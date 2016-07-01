@@ -1,0 +1,283 @@
+########################################################################
+# DSSM with Residual GRU 
+# 
+# no attention
+# no tying of query and context GRU parameters (but embedding is tied)
+# ranking loss
+#
+########################################################################
+
+RunRootDir = ".."      # default if not overridden
+DataDir    = "$RunRootDir$/Data"
+OutDir     = "$RunRootDir$/Out"
+
+command = train
+
+deviceId = auto 
+ExpId = ubuntu-2
+
+modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
+stderr     = "$OutDir$/$ExpId$/Ubuntu"
+
+vocabDim = 98687
+hiddenDim = 160
+embeddingDim = 160
+maxLayer = 1
+
+globalInput = [ Context1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query1 = [ dim = "$vocabDim$"; format = "sparse" ]; Context2 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2 = [ dim = "$vocabDim$"; format = "sparse" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
+
+#---------------------------
+# network
+#---------------------------
+
+BrainScriptNetworkBuilder = (new ComputationNetwork [
+
+#---------------------------
+# helper functions
+#---------------------------
+
+GRUInstantiate (outputDim, Zoh, Zoi, Zo, Rhh, Rhi, Rh, Hoh, Hoi, Ho, x, inputDim=x.dim, prevState, addDropout=false) = [
+  _privateInnards = [
+     htprev = prevState.h
+     hDim = prevState.dim
+     dropx = if addDropout then Dropout (x) else x
+
+     z = Sigmoid (Zoh * htprev + Zoi * dropx + Zo);
+     r = Sigmoid (Rhh * htprev + Rhi * dropx + Rh);
+     htilde = Tanh (Hoh * (r .* htprev) + Hoi * dropx + Ho)
+
+     ht = (Constant (1) - z) .* htilde + z .* htprev
+  ]
+
+  h = _privateInnards.ht
+  dim = outputDim
+]
+
+RecurrentGRUInstantiate (factory, 
+                         x,
+                         previousHook=BS.RNNs.GRUPreviousHC,
+                         layerIndex=0,
+                         addDropout=false) = [
+  layerIndex1 = layerIndex ; addDropout1 = addDropout
+
+  prevState = previousHook (gruState, layerIndex=layerIndex1) 
+
+  gruState = GRUInstantiate (factory.outputDim,
+                             factory.Zoh,
+                             factory.Zoi,
+                             factory.Zo,
+                             factory.Roh,
+                             factory.Roi,
+                             factory.Ro,
+                             factory.Hoh,
+                             factory.Hoi,
+                             factory.Ho,
+                             x,
+                             inputDim=factory.inputDim,
+                             prevState, 
+                             addDropout=addDropout1)
+].gruState
+
+RecurrentGRUFactory (outputDim, hDim, inputDim) = [
+  Woh() = BS.Parameters.WeightParam (outputDim, hDim)
+  Woi() = BS.Parameters.WeightParam (outputDim, inputDim)
+  Bo () = BS.Parameters.BiasParam (outputDim)
+  Whh() = BS.Parameters.WeightParam (hDim, hDim)
+  Whi() = BS.Parameters.WeightParam (hDim, inputDim)
+  Bh () = BS.Parameters.BiasParam (hDim)
+
+  res = [
+     Zoh = Woh (); Zoi = Woi (); Zo = Bo ()
+     Roh = Woh (); Roi = Woi (); Ro = Bo ()
+     Hoh = Woh (); Hoi = Woi (); Ho = Bo ()
+
+     inputDim = inputDim
+     hDim = hDim
+     outputDim = outputDim
+  ]
+].res
+
+RecurrentBiresidualGRUStackFactory (layerDims, inputDim) = [
+  layerDims1 = layerDims
+  inputDim1 = inputDim
+
+  res = [
+    factories[i:0..Length (layerDims)-1] = [
+      vDim = if i == 0 then inputDim else factories[i-1].dim
+
+      fwd = RecurrentGRUFactory (layerDims[i], layerDims[i], vDim)
+      bwd = RecurrentGRUFactory (layerDims[i], layerDims[i], vDim)
+      dim = layerDims[i]
+    ]
+
+    layerDims = layerDims1
+    inputDim = inputDim1
+  ]
+].res
+
+RecurrentBiresidualGRUStackInstantiate (factory,
+                                        input, 
+                                        previousHook=BS.RNNs.GRUPreviousHC,
+                                        nextHook=BS.RNNs.GRUNextHC,
+                                        addDropout=false) = [
+  previousHook1 = previousHook ; nextHook1 = nextHook ; 
+  addDropout1 = addDropout ;
+
+  layers[i:0..Length (factory.layerDims)-1] = [
+    dropInput = if i == 0 then if addDropout then Dropout (input) else input else layers[i-1].h
+
+    fwd = RecurrentGRUInstantiate (factory.factories[i].fwd,
+                                   dropInput,
+                                   previousHook=previousHook1,
+                                   layerIndex=i,
+                                   addDropout=addDropout1)
+
+    bwd = RecurrentGRUInstantiate (factory.factories[i].bwd,
+                                   dropInput,
+                                   previousHook=nextHook1,
+                                   layerIndex=i,
+                                   addDropout=addDropout1)
+
+    dropfh = if addDropout then Dropout (fwd.h) else fwd.h
+    dropbh = if addDropout then Dropout (bwd.h) else bwd.h
+    h = dropfh + dropbh + dropInput
+    dim = factory.layerDims[i] 
+  ]
+].layers
+
+#---------------------------
+# definition
+#---------------------------
+
+  vocabDim = $vocabDim$
+  hiddenDim = $hiddenDim$
+  embeddingDim = $embeddingDim$
+  precision = "float"
+  maxLayer = $maxLayer$
+  
+  netDims[i:0..maxLayer] = hiddenDim
+
+  contextAxis1 = DynamicAxis ();
+  Context1 = Input (vocabDim, dynamicAxis=contextAxis1, tag='feature')
+  queryAxis1 = DynamicAxis ()
+  Query1 = Input (vocabDim, dynamicAxis=queryAxis1, tag='feature')
+  contextAxis2 = DynamicAxis ();
+  Context2 = Input (vocabDim, dynamicAxis=contextAxis2, tag='feature')
+  queryAxis2 = DynamicAxis ()
+  Query2 = Input (vocabDim, dynamicAxis=queryAxis2, tag='feature')
+  MultiLabel = Input (2, tag='label')
+
+  # "averaging" network
+
+  avgNet (in) = [
+    mysum = in + PastValue (0, mysum, defaultHiddenActivation=0)
+    mycount = BS.Constants.OnesLike (in) + PastValue (0, mycount, defaultHiddenActivation=0)
+    myavg = ElementDivide (mysum, mycount)
+  ].myavg
+
+  # context GRU
+  contextEinput = BS.Parameter ($vocabDim$, embeddingDim, init='gaussian')
+  contextFactory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim)
+
+  contextEmbedded1 = TransposeTimes (contextEinput, Context1)
+  contextNet1 = RecurrentBiresidualGRUStackInstantiate (contextFactory, contextEmbedded1, addDropout=true)
+  contextOutput1 = Dropout (contextNet1[Length (netDims) - 1].h)
+  avgContextNetOutput1 = avgNet (contextOutput1)
+  lastAvgContextNetOutput1 = BS.Sequences.Last (avgContextNetOutput1)
+
+  contextEmbedded2 = TransposeTimes (contextEinput, Context2)
+  contextNet2 = RecurrentBiresidualGRUStackInstantiate (contextFactory, contextEmbedded2, addDropout=true)
+  contextOutput2 = Dropout (contextNet2[Length (netDims) - 1].h)
+  avgContextNetOutput2 = avgNet (contextOutput2)
+  lastAvgContextNetOutput2 = BS.Sequences.Last (avgContextNetOutput2)
+
+  # query GRU
+
+  queryEinput = BS.Parameter ($vocabDim$, embeddingDim, init='gaussian')
+  queryFactory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim)
+
+  queryEmbedded1 = TransposeTimes (queryEinput, Query1)
+  queryNet1 = RecurrentBiresidualGRUStackInstantiate (queryFactory, queryEmbedded1, addDropout=true)
+  queryOutput1 = Dropout (queryNet1[Length (netDims) - 1].h)
+  avgQueryNetOutput1 = avgNet (queryOutput1)
+  lastAvgQueryNetOutput1 = BS.Sequences.Last (avgQueryNetOutput1)
+
+  queryEmbedded2 = TransposeTimes (queryEinput, Query2)
+  queryNet2 = RecurrentBiresidualGRUStackInstantiate (queryFactory, queryEmbedded2, addDropout=true)
+  queryOutput2 = Dropout (queryNet2[Length (netDims) - 1].h)
+  avgQueryNetOutput2 = avgNet (queryOutput2)
+  lastAvgQueryNetOutput2 = BS.Sequences.Last (avgQueryNetOutput2)
+
+  # inner product similarity
+
+  similarityQuad1 = TransposeTimes (ReconcileDynamicAxis (lastAvgContextNetOutput1, lastAvgQueryNetOutput1), lastAvgQueryNetOutput1)
+  similarityQuad2 = TransposeTimes (ReconcileDynamicAxis (lastAvgContextNetOutput2, lastAvgQueryNetOutput2), lastAvgQueryNetOutput2)
+
+  # loss function
+  
+  comboScore = Splice ( ( similarityQuad1 : ReconcileDynamicAxis (similarityQuad2, similarityQuad1 ) ), axis=1 )
+  recCombo = ReconcileDynamicAxis (comboScore, MultiLabel)
+  ce = CrossEntropyWithSoftmax (MultiLabel, recCombo, tag='criterion')
+  errs = ErrorPrediction (MultiLabel, recCombo, tag='evaluation')
+])
+
+train = [
+  action = "train"
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/dubshortubuntu.train"
+    randomize = "true"
+
+    input = $globalInput$
+  ]
+
+  cvReader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/dubshortubuntu.valid"
+    randomize = "false"
+
+    input = $globalInput$
+  ]
+
+  SGD = [ 
+    modelPath = "$modelPath$"
+    epochSize = 0
+    keepCheckPointFiles = "false"
+    maxEpochs = 200
+    minibatchSize = 512
+    learningRatesPerMB = 2:1*3:0.2
+    momentumAsTimeConstant = 1024
+    dropoutRate = 0.0
+    gradUpdateType = "RMSProp"
+
+#    # settings for Auto Adjust Learning Rate
+#    AutoAdjust = [
+#        autoAdjustLR = "adjustAfterEpoch"
+#        reduceLearnRateIfImproveLessThan = -1
+#        continueReduce = false
+#        increaseLearnRateIfImproveMoreThan = 1000000000
+#        learnRateDecreaseFactor = 0.5
+#        learnRateIncreaseFactor = 1.382
+#    ]
+  ]
+]
+
+# TODO: this can only test accuracy with 1 distractor
+test = [
+  action = "eval"
+
+  minibatchSize = 1024
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/dubshortubuntu.test"
+    randomize = "false"
+
+    input = $globalInput$
+  ]
+]

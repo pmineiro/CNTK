@@ -1,0 +1,149 @@
+#! /usr/bin/env perl
+
+use warnings;
+use strict;
+
+use Text::CSV;
+
+sub save_hash ($$)
+{
+  my ($filename, $hash) = @_;
+  my $fh = new IO::File $filename, "w" or die "$filename: $!";
+  $fh->binmode (":utf8");
+
+  while (my ($k, $v) = each %$hash)
+    {
+      print $fh "$k\t$v\n";
+    }
+}
+
+sub load_hash ($$)
+{
+  my ($filename, $hash) = @_;
+  my $fh = new IO::File $filename, "r" or die "$filename: $!";
+
+  while (defined ($_ = <$fh>))
+    {
+      chomp;
+      my ($k, $v) = split /\t/, $_, 2;
+
+      $hash->{$k} = $v;
+    }
+}
+
+my $oov = 0;
+
+sub encode ($$)
+{
+  my ($v, $dict) = @_;
+
+  $dict->{$v} ||= do { ++$oov; scalar keys %$dict; };
+
+  return $dict->{$v};
+}
+
+#----------------------------------------------------------------
+
+my %vocab;
+
+sub printexample ($$$$$)
+{
+  my ($sid, $context1, $query1, $context2, $query2) = @_;
+
+  foreach my $var ((\$context1, \$query1, \$context2, \$query2))
+    {
+      $$var =~ s/([[:punct:]]+)\s/ $1 /g;
+      $$var =~ s/\s([[:punct:]]+)/ $1 /g;
+    }
+
+  my @fullcontext1 = split /\s+/, $context1;
+  my @context1 = @fullcontext1 > 40 ? splice @fullcontext1, -40 : @fullcontext1;
+  my @query1 = split /\s+/, $query1;
+  my @fullcontext2 = split /\s+/, $context2;
+  my @context2 = @fullcontext2 > 40 ? splice @fullcontext2, -40 : @fullcontext2;
+  my @query2 = split /\s+/, $query2;
+
+  my $ml = "|MultiLabel 1 0";
+
+  while (@context1 || @query1 || @context2 || @query2)
+    {
+      my $ct1 = @context1 ? "|Context1 @{[encode (shift @context1, \%vocab)]}:1" : "";
+      my $qt1 = @query1 ? "|Query1 @{[encode (shift @query1, \%vocab)]}:1" : "";
+      my $ct2 = @context2 ? "|Context2 @{[encode (shift @context2, \%vocab)]}:1" : "";
+      my $qt2 = @query2 ? "|Query2 @{[encode (shift @query2, \%vocab)]}:1" : "";
+
+      print "$sid $ct1 $qt1 $ct2 $qt2 $ml\n";
+
+      $ml = "";
+    }
+}
+
+#----------------------------------------------------------------
+
+my $mode = shift @ARGV or die;
+$mode eq "train" || $mode eq "test" || $mode eq "valid" or die "bad mode $mode";
+my $vocabfile = "dubshortvocab";
+
+if ($mode eq "test" || $mode eq "valid")
+  {
+    load_hash ($vocabfile, \%vocab);
+  }
+
+my $csv = Text::CSV->new ({ binary => 1 }) or die Text::CSV->error_diag ();
+
+# i think we could import the old comments via rsync, but from there we need to go via email. I think it is easier than caching the status on each bug and than import bits here and there __eou__ __eot__ it would be very easy to keep a hash db of message-ids  __eou__ sounds good __eou__ __eot__ ok __eou__ perhaps we can ship an ad-hoc apt_prefereces __eou__ __eot__ version? __eou__ __eot__ thanks __eou__ __eot__ not yet __eou__ it is covered by your insurance? __eou__ __eot__ yes __eou__ but it's really not the right time :/ __eou__ with a changing house upcoming in 3 weeks __eou__ __eot__ you will be moving into your house soon? __eou__ posted a message recently which explains what to do if the autoconfiguration does not do what you expect __eou__ __eot__ how urgent is #896? __eou__ __eot__ not particularly urgent, but a policy violation __eou__ __eot__ i agree that we should kill the -novtswitch __eou__ __eot__ ok __eou__ __eot__ would you consider a package split a feature? __eou__ __eot__ context? __eou__ __eot__ splitting xfonts* out of xfree86*. one upload for the rest of the life and that's it __eou__ __eot__ splitting the source package you mean? __eou__ __eot__ yes. same binary packages. __eou__ __eot__ I would prefer to avoid it at this stage.  this is something that has gone into XSF svn, I assume? __eou__ __eot__  at ./ubuntu2trainv1 line 17, <> line 2.
+# basically each xfree86 upload will NOT force users to upgrade 100Mb of fonts for nothing __eou__ no something i did in my spare time. __eou__ at ./ubuntu2trainv1 line 18, <> line 2.
+# 1.0 at ./ubuntu2trainv1 line 19, <> line 2.
+
+# eat header
+<>;
+
+my $sid = 1;
+my $skip = 0;
+my $maxsid = $mode eq "train" ? 100000 : 10000;
+my @positives;
+my @negatives;
+
+while (my $row = $csv->getline (*ARGV))
+  {
+    my @fields = @$row;
+
+    if ($mode eq "train")
+      {
+        # ugh ... why the different format between train and valid/test ?
+        
+        do { ++$skip; next } unless $fields[2] eq "1.0" || $fields[2] eq "0.0";
+
+        if ($fields[2] eq "1.0")
+          {
+            push @positives, \@fields;
+          }
+        elsif ($fields[2] eq "0.0")
+          {
+            push @negatives, \@fields;
+          }
+
+        while (@positives && @negatives)
+          {
+            my $p = shift @positives;
+            my $n = shift @negatives;
+
+            my ($c1, $q1, undef) = @$p;
+            my ($c2, $q2, undef) = @$n;
+
+            printexample ($sid, $c1, $q1, $c2, $q2);
+            ++$sid;
+          }
+      }
+    else
+      {
+        printexample ($sid, $fields[0], $fields[1], $fields[0], $fields[2]);
+        ++$sid;
+      }
+
+    last if ++$sid > $maxsid;
+  }
+
+save_hash ($vocabfile, \%vocab);
+
+warn join "\t", $oov, $skip;
