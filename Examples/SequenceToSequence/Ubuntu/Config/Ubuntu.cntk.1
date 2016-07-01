@@ -6,6 +6,9 @@
 #
 ########################################################################
 
+# Finished Epoch[36 of 200]: [Training] ce = 0.61686070 * 100000; errs = 35.146% * 100000; totalSamplesSeen = 3600000; learningRatePerSample = 0.00039062501; epoc hTime=3336.1s
+# Finished Epoch[36 of 200]: [Validate] ce = 0.81833946 * 10000; errs = 50.000% * 10000
+
 RunRootDir = ".."      # default if not overridden
 DataDir    = "$RunRootDir$/Data"
 OutDir     = "$RunRootDir$/Out"
@@ -18,9 +21,9 @@ ExpId = ubuntu-1
 modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
 stderr     = "$OutDir$/$ExpId$/Ubuntu"
 
-vocabDim = 45214
-hiddenDim = 160
-embeddingDim = 160
+vocabDim = 121223
+hiddenDim = 320
+embeddingDim = 320
 maxLayer = 1
 
 globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Query = [ dim = "$vocabDim$"; format = "sparse" ]; Label = [ dim = 1; format = "dense" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
@@ -55,7 +58,7 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
 
   # embedding
   
-  Einput = BS.Parameters.WeightParam ($vocabDim$, embeddingDim)
+  Einput = BS.Parameter ($vocabDim$, embeddingDim, init='gaussian')
 
   # context GRU
 
@@ -76,9 +79,8 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
 
   # inner product similarity
 
-  simMetric = BS.Parameters.WeightParam (hiddenDim, hiddenDim)
-  # simBias = 0
-  similarityQuad = FlattenDimensions (TransposeTimes (TransposeTimes (simMetric, lastAvgContextNetOutput), lastAvgQueryNetOutput), 1, 2)
+  simBias = BS.ParameterTensor ((1), init='fixedValue', value=-1)
+  similarityQuad = simBias + TransposeTimes (lastAvgContextNetOutput, lastAvgQueryNetOutput)
 
   # loss function
   
@@ -89,7 +91,7 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
 
 #  p = Sigmoid (similarityQuad)
 #  recP = ReconcileDynamicAxis (p, Label)
-#  lr = Logistic (Label, recP, tag='criterion')
+#  lr = Logistic (Label, recP, tag='evaluation')
 #  errs = SquareError (Label, recP, tag='evaluation')
 ])
 
@@ -100,7 +102,7 @@ train = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/ubuntu.train"
+    file = "$DataDir$/shortubuntu.train"
     randomize = "true"
 
     input = $globalInput$
@@ -108,7 +110,7 @@ train = [
 
   cvReader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/ubuntu.valid"
+    file = "$DataDir$/shortubuntu.valid"
     randomize = "false"
 
     input = $globalInput$
@@ -119,21 +121,20 @@ train = [
     epochSize = 0
     keepCheckPointFiles = "false"
     maxEpochs = 200
-    minibatchSize = 128
-    learningRatesPerSample = 0.005*15:0.001*50:0.0005*50:0.0001
-    momentumAsTimeConstant = 0
-    dropoutRate = 0.5
-    gradUpdateType = "None"
+    minibatchSize = 512
+    learningRatesPerMB = 2:1*3:0.2
+    momentumAsTimeConstant = 1024
+    dropoutRate = 0.0
+    gradUpdateType = "RMSProp"
 
 #    # settings for Auto Adjust Learning Rate
 #    AutoAdjust = [
 #        autoAdjustLR = "adjustAfterEpoch"
-#        reduceLearnRateIfImproveLessThan = 0
+#        reduceLearnRateIfImproveLessThan = -1
 #        continueReduce = false
 #        increaseLearnRateIfImproveMoreThan = 1000000000
 #        learnRateDecreaseFactor = 0.5
 #        learnRateIncreaseFactor = 1.382
-#        learnRateAdjustInterval = 5
 #    ]
   ]
 ]
@@ -148,7 +149,7 @@ test = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/ubuntu.test"
+    file = "$DataDir$/shortubuntu.test"
     randomize = "false"
 
     input = $globalInput$
