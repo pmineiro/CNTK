@@ -49,18 +49,12 @@ sub tokenize ($)
 {
   my ($s) = @_;
 
-  return map { substr ($_, 0, 7) } split /\s+/, $s;
-}
-
-sub preprocess ($)
-{
-  my ($v) = @_;
-
-  $v =~ s/([[:punct:]]+)\s/ $1 /g;
-  $v =~ s/\s([[:punct:]]+)/ $1 /g;
-  $v = lc ($v);
-
-  return $v;
+  return map { #s/[[:punct:]]+$//g; 
+               #s/^[[:punct:]]+//g;
+               s/[0-9]+/0/g;
+               substr ($_, 0, 7) } 
+               split /[\s[:punct:]]+/, 
+               lc ($s);
 }
 
 #----------------------------------------------------------------
@@ -74,10 +68,10 @@ sub printexample ($@)
 
   local $\="\n";
 
-  my @fullcontext = tokenize preprocess $context;
+  my @fullcontext = tokenize $context;
   my @context = @fullcontext > 40 ? splice @fullcontext, -40 : @fullcontext;
 
-  my @tokenized = map { [ split /\s+/, tokenize preprocess ($_) ] } @queries;
+  my @tokenized = map { [ tokenize ($_) ] } @queries;
 
   my $ml = join " ", "|MultiLabel", "1", map { 0 } (1 .. $#queries);
 
