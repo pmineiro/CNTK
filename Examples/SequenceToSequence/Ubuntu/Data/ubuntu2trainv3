@@ -42,6 +42,13 @@ sub encode ($$)
   return $dict->{$v};
 }
 
+sub tokenize ($)
+{
+  my ($s) = @_;
+
+  return map { substr ($_, 0, 7) } split /\s+/, $s;
+}
+
 #----------------------------------------------------------------
 
 my %vocab;
@@ -54,11 +61,12 @@ sub printexample ($$$$)
     {
       $$var =~ s/([[:punct:]]+)\s/ $1 /g;
       $$var =~ s/\s([[:punct:]]+)/ $1 /g;
+      $$var = lc ($$var);
     }
 
-  my @context = split /\s+/, $context;
-  my @query1 = split /\s+/, $query1;
-  my @query2 = split /\s+/, $query2;
+  my @context = tokenize $context;
+  my @query1 = tokenize $query1;
+  my @query2 = tokenize $query2;
 
   my $ml = "|MultiLabel 1 0";
 

@@ -2,6 +2,12 @@
 
 all: ubuntu3.megatrain ubuntu3.valid ubuntu3.test
 
+shortubuntu4.megatrain: megatrain.csv ubuntu2trainv4short
+	perl ./$(word 2,$^) megatrain $< > $@
+
+shortubuntu4.%: %.csv ubuntu2trainv4short shortubuntu4.megatrain
+	perl ./$(word 2,$^) $* $< > $@
+
 ubuntu3.megatrain: megatrain.csv ubuntu2trainv3
 	perl ./$(word 2,$^) megatrain $< > $@
 
