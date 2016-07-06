@@ -1,11 +1,12 @@
 ########################################################################
-# GRU residual learning version of experiment 3
-# 
-# 1 layer, 60 dim, dropout 0.5: 2.5% / 34.6% train / dev error
-# 1 layer, 60 dim, residual dropout 0.5: 3.1% / 31.8% train / dev error
-# 1 layer, 80 dim, residual dropout 0.5: 2.9% / 31.6% train / dev error
-# 1 layer, 160 dim, residual dropout 0.5: 2.4% / 30.0% train / dev error
-#
+# Attention version of experiment 8
+########################################################################
+
+########################################################################
+#  (All clues, uniform average)
+#  
+#  Finished Epoch[16 of 200]: [Training] ce = 0.01668583 * 15620; errs = 0.128% * 15620; totalSamplesSeen = 249920; learningRatePerSample = 0.0099999998; epochTime=3084.34s
+#  Finished Epoch[16 of 200]: [Validate] ce = 1.75745921 * 2368; errs = 35.051% * 2368
 ########################################################################
 
 RunRootDir = ".."      # default if not overridden
@@ -15,7 +16,7 @@ OutDir     = "$RunRootDir$/Out"
 command = train
 
 deviceId = auto 
-ExpId = quizbowl-8d
+ExpId = quizbowl-9
 
 modelPath  = "$OutDir$/$ExpId$/QuizBowl.dnn"
 stderr     = "$OutDir$/$ExpId$/QuizBowl"
@@ -24,14 +25,14 @@ inputVocabDim = 70911
 labelDim = 2370
 hiddenDim = 160
 embeddingDim = 160
-maxLayer = 1
+maxLayer = 0
 
 #---------------------------
 # network
 #---------------------------
 
 BrainScriptNetworkBuilder = (new ComputationNetwork [
-include "GRU.bs"
+  include "GRU.bs"
 
   inputVocabDim = $inputVocabDim$
   labelDim = $labelDim$
@@ -50,9 +51,20 @@ include "GRU.bs"
   inputEmbedded = TransposeTimes (Einput, Word)
   net = RecurrentBiresidualGRUStack (netDims, inputEmbedded, inputDim=embeddingDim, addDropout=true)
   netOutput = Dropout (net[Length (netDims) - 1].h)
+  attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
+  attPre = FlattenDimensions (TransposeTimes (attV, netOutput), 1, 2)
+  SoftMaxOverSequence (z) = [
+    runningLogSum = BS.LogPlus (z, PastValue (0, runningLogSum, defaultHiddenActivation=-1e30))
+    logSum = BS.Boolean.If (BS.Loop.IsLast (runningLogSum), # if last entry
+                   /*then*/ runningLogSum,                     # then copy that
+                   /*else*/ FutureValue (0, logSum))           # else just propagate to the front
+    result = Exp (z - logSum)
+  ].result
+  attSoft = SoftMaxOverSequence (attPre)
+  weightedNetOutput = ElementTimes (attSoft, netOutput)
   avgNetOutput = [
-    mysum = netOutput + PastValue (0, mysum, defaultHiddenActivation=0)
-    mycount = BS.Constants.OnesLike (netOutput) + PastValue (0, mycount, defaultHiddenActivation=0)
+    mysum = weightedNetOutput + PastValue (0, mysum, defaultHiddenActivation=0)
+    mycount = BS.Constants.OnesLike (weightedNetOutput) + PastValue (0, mycount, defaultHiddenActivation=0)
     myavg = ElementDivide (mysum, mycount)
   ].myavg
   lastAvgNetOutput = BS.Sequences.Last (avgNetOutput)
