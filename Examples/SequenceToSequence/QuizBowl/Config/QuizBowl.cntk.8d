@@ -15,12 +15,12 @@ OutDir     = "$RunRootDir$/Out"
 command = train
 
 deviceId = auto 
-ExpId = quizbowl-8dd
+ExpId = quizbowl-8d
 
 modelPath  = "$OutDir$/$ExpId$/QuizBowl.dnn"
 stderr     = "$OutDir$/$ExpId$/QuizBowl"
 
-inputVocabDim = 26665
+inputVocabDim = 70911
 labelDim = 2370
 hiddenDim = 160
 embeddingDim = 160

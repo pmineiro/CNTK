@@ -59,6 +59,15 @@ if ($mode eq "test" || $mode eq "dev")
     load_hash ("label", \%label);
   }
 
+sub tokenize ($)
+{
+  my ($s) = @_;
+
+  return map { substr ($_, 0, 7) }
+         split /[\s[:punct:]]+/,
+         lc ($s);
+}
+
 #-------------------------
 
 my $header = <>; 
@@ -77,12 +86,10 @@ while (defined ($_ = <>))
     $encans = " |Answer ${encans}:1";
 
     do { ++$skip; next } unless $text =~ /\|\|\|/;
-    $text =~ s/^"//; $text =~ s/"$//; 
     my @clues = split /\|\|\|/, $text;
-    $text = join " ", @clues[-1];
-    $text =~ s/""/"/g; $text =~ s/([[:punct:]])/ $1 /g;
+    $text = join " ", @clues;
 
-    my @tokens = split /\s+/, $text;
+    my @tokens = tokenize $text;
     next unless @tokens;
 
     #warn join " ::: ", @tokens;
