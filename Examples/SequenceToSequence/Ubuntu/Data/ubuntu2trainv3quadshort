@@ -4,6 +4,7 @@ use warnings;
 use strict;
 
 use Text::CSV;
+use Data::Dumper;
 
 my $mode = shift @ARGV or die;
 
@@ -42,7 +43,7 @@ sub load_hash ($$)
     }
 }
 
-sub encode ($$)
+sub encodetri ($$)
 {
   my ($v, $dict) = @_;
 
@@ -55,18 +56,92 @@ sub encode ($$)
   return exists $dict->{$v} ? $dict->{$v}->[0] : 1 + scalar keys %$dict;
 }
 
+sub morphofeatures ($$)
+{
+  my ($s, $codec) = @_;
+
+  my @morpho;
+
+  if ($s =~ m/^[[:upper:]]/)
+    {
+      push @morpho, (join ":", encodetri (" m:firstcap", $codec), 1);
+    }
+
+  if ($s !~ m/[[:lower:]]/)
+    {
+      push @morpho, (join ":", encodetri (" m:nolower", $codec), 1);
+    }
+
+
+  return @morpho;
+}
+
+sub process ($$)
+{
+  my ($fulls, $codec) = @_;
+
+  my $s = lc ($fulls);
+  my @morpho = morphofeatures ($fulls, $codec);
+
+  my $numchars = 3; # trigrams = 2, quadgrams = 3, etc.
+
+  my @chars = split //, $s;
+  do
+    {
+      push @morpho, join ":", encodetri ($s, $codec), "1";
+      return join " ", @morpho;
+    }
+  if $#chars < $numchars;
+
+  my %trigrams;
+
+  foreach my $pos ($numchars .. $#chars)
+    {
+      ++$trigrams{join "", @chars[$pos-$numchars .. $pos]};
+    }
+
+  my $sum = 0;
+  while (my (undef, $v) = each %trigrams)
+    {
+      $sum += $v;
+    }
+
+  my @tristring;
+
+  while (my ($k, $v) = each %trigrams)
+    {
+      push @tristring, (join ":", 
+                          encodetri ($k, $codec),
+                          sprintf ("%.3f", sqrt ($v / $sum)));
+    }
+
+  return join " ", @tristring, @morpho;
+}
+
+sub encode ($$$)
+{
+  my ($v, $trimemo, $codec) = @_;
+
+  $trimemo->{$v} ||= process ($v, $codec);
+
+#  warn $trimemo->{$v};
+
+  return $trimemo->{$v};
+}
+
 sub tokenize ($)
 {
   my ($s) = @_;
 
-  return map { s/[0-9]+/0/g;
-               substr ($_, 0, 7) } 
-               split /[\s[:punct:]]+/, 
-               lc ($s);
+  return map { s/[0-9]+/0/g; 
+               $_ }
+             split /[\s[:punct:]]+/,
+             $s;
 }
 
 #----------------------------------------------------------------
 
+my %trimemo;
 my %vocab;
 
 sub printexample ($$$$)
@@ -84,9 +159,9 @@ sub printexample ($$$$)
 
   while (@context || @query1 || @query2)
     {
-      my $ct1 = @context ? "|Context @{[encode (shift @context, \%vocab)]}:1" : "";
-      my $qt1 = @query1 ? "|Query1 @{[encode (shift @query1, \%vocab)]}:1" : "";
-      my $qt2 = @query2 ? "|Query2 @{[encode (shift @query2, \%vocab)]}:1" : "";
+      my $ct1 = @context ? "|Context @{[encode (shift @context, \%trimemo, \%vocab)]}" : "";
+      my $qt1 = @query1 ?  "|Query1 @{[encode (shift @query1, \%trimemo, \%vocab)]}" : "";
+      my $qt2 = @query2 ?  "|Query2 @{[encode (shift @query2, \%trimemo, \%vocab)]}" : "";
 
       print "$sid $ct1 $qt1 $qt2 $ml\n";
 
@@ -96,7 +171,7 @@ sub printexample ($$$$)
 
 #----------------------------------------------------------------
 
-my $vocabfile = "shortvocab3";
+my $vocabfile = "shortvocab3quad";
 
 load_hash ($vocabfile, \%vocab);
 

@@ -1,11 +1,11 @@
 *.csv
 ubuntu.*
 vocab
-shortubuntu.*
+shortubuntu*
 shortvocab
 dubshortubuntu.*
 dubshortvocab
 shortubuntu?.*
-shortvocab?
+shortvocab*
 ubuntu?.*
 vocab3
