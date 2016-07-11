@@ -1,10 +1,5 @@
 ########################################################################
-# DSSM with Residual GRU 
-# 
-# no attention
-# no tying of query and context GRU parameters (but embedding is tied)
-# ranking loss
-#
+# trigram variant
 ########################################################################
 
 RunRootDir = ".."      # default if not overridden
@@ -19,12 +14,15 @@ ExpId = ubuntu-3
 modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
 stderr     = "$OutDir$/$ExpId$/Ubuntu"
 
-vocabDim = 46331
+vocabDim = 15015
 hiddenDim = 320
 embeddingDim = 320
 maxLayer = 1
 useLast = false
 initLearningRate = 0.5
+dropoutRate = 0.0
+minibatchSize = 768
+restartFrom = "/dev/null"
 
 globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Query1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2 = [ dim = "$vocabDim$"; format = "sparse" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
 
@@ -32,7 +30,8 @@ globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Query1 = [ 
 # network
 #---------------------------
 
-BrainScriptNetworkBuilder = (new ComputationNetwork [
+BrainScriptNetworkBuilder = (if "$restartFrom$" == "/dev/null"
+then (new ComputationNetwork [
 
 #---------------------------
 # helper functions
@@ -220,6 +219,10 @@ RecurrentBiresidualGRUStackInstantiate (factory,
   ce = CrossEntropyWithSoftmax (MultiLabel, recCombo, tag='criterion')
   errs = ErrorPrediction (MultiLabel, recCombo, tag='evaluation')
 ])
+else
+(BS.Network.Load ("$restartFrom$"))
+)
+
 
 train = [
   action = "train"
@@ -228,7 +231,7 @@ train = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3.megatrain"
+    file = "$DataDir$/shortubuntu3tri.megatrain"
     randomize = "true"
 
     input = $globalInput$
@@ -236,7 +239,7 @@ train = [
 
   cvReader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3.valid"
+    file = "$DataDir$/shortubuntu3tri.valid"
     randomize = "false"
 
     input = $globalInput$
@@ -247,10 +250,10 @@ train = [
     epochSize = 0
     keepCheckPointFiles = "false"
     maxEpochs = 200
-    minibatchSize = 768
+    minibatchSize = $minibatchSize$
     learningRatesPerMB = $initLearningRate$
     momentumPerMB = 0.9
-    dropoutRate = 0.0
+    dropoutRate = $dropoutRate$
     gradUpdateType = "RMSProp"
 
     # settings for Auto Adjust Learning Rate
@@ -266,13 +269,13 @@ train = [
 test = [
   action = "eval"
 
-  minibatchSize = 1024
+  minibatchSize = $minibatchSize$
   traceLevel = 1
   epochSize = 0
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3.test"
+    file = "$DataDir$/shortubuntu3tri.test"
     randomize = "false"
 
     input = $globalInput$

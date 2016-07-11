@@ -2,22 +2,34 @@
 
 all: ubuntu3.megatrain ubuntu3.valid ubuntu3.test
 
-shortubuntu4.megatrain: megatrain.csv ubuntu2trainv4short
-	perl ./$(word 2,$^) megatrain $< > $@
+shortvocab4: megatrain.csv ubuntu2trainv4short
+	perl ./$(word 2,$^) preprocess $< > /dev/null
 
-shortubuntu4.%: %.csv ubuntu2trainv4short shortubuntu4.megatrain
+shortubuntu4.%: %.csv ubuntu2trainv4short shortvocab4
 	perl ./$(word 2,$^) $* $< > $@
 
-ubuntu3.megatrain: megatrain.csv ubuntu2trainv3
-	perl ./$(word 2,$^) megatrain $< > $@
+shortvocab3quad: megatrain.csv ubuntu2trainv3quadshort
+	perl ./$(word 2,$^) preprocess $< > /dev/null
 
-ubuntu3.%: %.csv ubuntu2trainv3 ubuntu3.megatrain
+shortubuntu3quad.%: %.csv ubuntu2trainv3quadshort shortvocab3quad
 	perl ./$(word 2,$^) $* $< > $@
 
-shortubuntu3.megatrain: megatrain.csv ubuntu2trainv3short
-	perl ./$(word 2,$^) megatrain $< > $@
+shortvocab3tri: megatrain.csv ubuntu2trainv3trishort
+	perl ./$(word 2,$^) preprocess $< > /dev/null
 
-shortubuntu3.%: %.csv ubuntu2trainv3short shortubuntu3.megatrain
+shortubuntu3tri.%: %.csv ubuntu2trainv3trishort shortvocab3tri
+	perl ./$(word 2,$^) $* $< > $@
+
+shortvocab3: megatrain.csv ubuntu2trainv3short
+	perl ./$(word 2,$^) preprocess $< > /dev/null
+
+shortubuntu3.%: %.csv ubuntu2trainv3short shortvocab3
+	perl ./$(word 2,$^) $* $< > $@
+
+vocab3: megatrain.csv ubuntu2trainv3
+	perl ./$(word 2,$^) preprocess $< > /dev/null
+
+ubuntu3.%: %.csv ubuntu2trainv3 vocab3
 	perl ./$(word 2,$^) $* $< > $@
 
 dubshortubuntu.train: train.csv ubuntu2trainv2short

@@ -23,7 +23,7 @@ inline size_t GetSizeByType(ElementType type)
     case ElementType::tatom:
         return sizeof(char);
     default:
-        RuntimeError("Unsupported type '%d'", type);
+        RuntimeError("Unsupported type '%d'", (int) type);
     }
 }
 } } }
