@@ -21,7 +21,7 @@ sub save_hash ($$)
       while (my ($k, $v) = each %$hash)
         {
           my (undef, $c) = @$v;
-          do { print $fh "$k\t$index\t$c\n"; ++$index; } if $c > 1;
+          do { print $fh "$k\t$index\t$c\n"; ++$index; } if $c > 4;
         }
     }
 }
@@ -43,9 +43,9 @@ sub load_hash ($$)
     }
 }
 
-sub encodetri ($$)
+sub encodeany ($$$)
 {
-  my ($v, $dict) = @_;
+  my ($v, $dict, $off) = @_;
 
   if ($mode eq "preprocess")
     {
@@ -53,7 +53,21 @@ sub encodetri ($$)
       ++$dict->{$v}->[1];
     }
 
-  return exists $dict->{$v} ? $dict->{$v}->[0] : 1 + scalar keys %$dict;
+  return exists $dict->{$v} ? $dict->{$v}->[0] : $off + scalar keys %$dict;
+}
+
+sub encodetri ($$)
+{
+  my ($v, $dict) = @_;
+
+  return encodeany ($v, $dict, 1);
+}
+
+sub encode ($$)
+{
+  my ($v, $dict) = @_;
+
+  return encodeany (" $v", $dict, 2);
 }
 
 sub morphofeatures ($$)
@@ -64,14 +78,13 @@ sub morphofeatures ($$)
 
   if ($s =~ m/^[[:upper:]]/)
     {
-      push @morpho, (join ":", encodetri (" m:firstcap", $codec), 1);
+      push @morpho, (join ":", encode (" m:firstcap", $codec), 1);
     }
 
   if ($s !~ m/[[:lower:]]/)
     {
-      push @morpho, (join ":", encodetri (" m:nolower", $codec), 1);
+      push @morpho, (join ":", encode (" m:nolower", $codec), 1);
     }
-
 
   return @morpho;
 }
@@ -82,13 +95,13 @@ sub process ($$)
 
   my $s = lc ($fulls);
   my @morpho = morphofeatures ($fulls, $codec);
+  push @morpho, join ":", encode ($s, $codec), "1";
 
   my $numchars = 3; # trigrams = 2, quadgrams = 3, etc.
 
   my @chars = split //, $s;
   do
     {
-      push @morpho, join ":", encodetri ($s, $codec), "1";
       return join " ", @morpho;
     }
   if $#chars < $numchars;
@@ -118,7 +131,7 @@ sub process ($$)
   return join " ", @tristring, @morpho;
 }
 
-sub encode ($$$)
+sub features ($$$)
 {
   my ($v, $trimemo, $codec) = @_;
 
@@ -159,9 +172,9 @@ sub printexample ($$$$)
 
   while (@context || @query1 || @query2)
     {
-      my $ct1 = @context ? "|Context @{[encode (shift @context, \%trimemo, \%vocab)]}" : "";
-      my $qt1 = @query1 ?  "|Query1 @{[encode (shift @query1, \%trimemo, \%vocab)]}" : "";
-      my $qt2 = @query2 ?  "|Query2 @{[encode (shift @query2, \%trimemo, \%vocab)]}" : "";
+      my $ct1 = @context ? "|Context @{[features (shift @context, \%trimemo, \%vocab)]}" : "";
+      my $qt1 = @query1 ?  "|Query1 @{[features (shift @query1, \%trimemo, \%vocab)]}" : "";
+      my $qt2 = @query2 ?  "|Query2 @{[features (shift @query2, \%trimemo, \%vocab)]}" : "";
 
       print "$sid $ct1 $qt1 $qt2 $ml\n";
 
