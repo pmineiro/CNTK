@@ -106,7 +106,14 @@ public:
             Input(1 - inputIndex)->MaskMissingValueColumnsToZero(fr);
 
         // TODO: would be nice to state the derivative here in a comment
-        inputGradient.AddElementwiseProductWithLogSumDerivativeOf(gradient, input0, input1);
+        if (inputIndex == 0)
+        {
+          inputGradient.AddElementwiseProductWithLogSumDerivativeOf(gradient, input1, input0);
+        }
+        else
+        {
+          inputGradient.AddElementwiseProductWithLogSumDerivativeOf(gradient, input0, input1);
+        }
     }
 };
 

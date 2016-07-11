@@ -50,23 +50,23 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
   Einput = BS.Parameters.WeightParam ($inputVocabDim$, embeddingDim)
   inputEmbedded = TransposeTimes (Einput, Word)
   net = RecurrentBiresidualGRUStack (netDims, inputEmbedded, inputDim=embeddingDim, addDropout=true)
-  netOutput = Dropout (net[Length (netDims) - 1].h)
-  attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
-  attPre = FlattenDimensions (TransposeTimes (attV, netOutput), 1, 2)
+  prenetOutput = net[Length (netDims) - 1].h
+#  attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
+#  attPre = FlattenDimensions (TransposeTimes (attV, prenetOutput), 1, 2)
+  attPre = BS.Constants.ZeroesLike (prenetOutput)
   SoftMaxOverSequence (z) = [
     runningLogSum = BS.LogPlus (z, PastValue (0, runningLogSum, defaultHiddenActivation=-1e30))
-    logSum = BS.Boolean.If (BS.Loop.IsLast (runningLogSum), # if last entry
+    logSum = BS.Boolean.If (BS.Loop.IsLast (runningLogSum),    # if last entry
                    /*then*/ runningLogSum,                     # then copy that
                    /*else*/ FutureValue (0, logSum))           # else just propagate to the front
     result = Exp (z - logSum)
   ].result
   attSoft = SoftMaxOverSequence (attPre)
+  netOutput = Dropout (prenetOutput)
   weightedNetOutput = ElementTimes (attSoft, netOutput)
   avgNetOutput = [
     mysum = weightedNetOutput + PastValue (0, mysum, defaultHiddenActivation=0)
-    mycount = BS.Constants.OnesLike (weightedNetOutput) + PastValue (0, mycount, defaultHiddenActivation=0)
-    myavg = ElementDivide (mysum, mycount)
-  ].myavg
+  ].mysum
   lastAvgNetOutput = BS.Sequences.Last (avgNetOutput)
 
   wOutput = BS.Parameters.WeightParam (net[Length (netDims) - 1].dim, $labelDim$)
