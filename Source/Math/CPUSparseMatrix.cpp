@@ -349,7 +349,7 @@ CPUSparseMatrix<ElemType>& CPUSparseMatrix<ElemType>::DoGatherColumnsOf(ElemType
     for (long j = 0; j < numCols; j++)
     {
         auto jInF = idx(0, j); // this is the column we need to get
-        if (::isnan(jInF) || (jInF < 0))     // negative index means gap
+        if (std::isnan(jInF) || (jInF < 0))     // negative index means gap
             continue;
         size_t jIn = (size_t)jInF;
 
@@ -366,7 +366,7 @@ CPUSparseMatrix<ElemType>& CPUSparseMatrix<ElemType>::DoGatherColumnsOf(ElemType
     for (long j = 0; j < numCols; j++)
     {
         auto jInF = idx(0, j); // this is the column we need to get
-        if (::isnan(jInF) || (jInF < 0))     // negative index means gap
+        if (std::isnan(jInF) || (jInF < 0))     // negative index means gap
             continue;
         size_t jIn = (size_t)jInF;
 
