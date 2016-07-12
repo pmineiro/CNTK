@@ -21,7 +21,7 @@ sub save_hash ($$)
       while (my ($k, $v) = each %$hash)
         {
           my (undef, $c) = @$v;
-          do { print $fh "$k\t$index\t$c\n"; ++$index; } if $c > 4;
+          do { print $fh "$k\t$index\t$c\n"; ++$index; } if $c > 2;
         }
     }
 }
@@ -43,6 +43,8 @@ sub load_hash ($$)
     }
 }
 
+my %exdedup;
+
 sub encodeany ($$$)
 {
   my ($v, $dict, $off) = @_;
@@ -50,7 +52,7 @@ sub encodeany ($$$)
   if ($mode eq "preprocess")
     {
       $dict->{$v} ||= [ scalar keys %$dict, 0 ];
-      ++$dict->{$v}->[1];
+      do { ++$dict->{$v}->[1]; $exdedup{$v} = 1; } unless exists $exdedup{$v};
     }
 
   return exists $dict->{$v} ? $dict->{$v}->[0] : $off + scalar keys %$dict;
@@ -162,13 +164,15 @@ sub printexample ($$$$)
   my ($sid, $context, $query1, $query2) = @_;
 
   my @fullcontext = tokenize $context;
-  my @context = @fullcontext > 40 ? splice @fullcontext, -40 : @fullcontext;
+  my @context = @fullcontext > 80 ? splice @fullcontext, -80 : @fullcontext;
   my @fullquery1 = tokenize $query1;
-  my @query1 = @fullquery1 > 40 ? splice @fullquery1, 40 : @fullquery1;
+  my @query1 = @fullquery1 > 80 ? splice @fullquery1, 80 : @fullquery1;
   my @fullquery2 = tokenize $query2;
-  my @query2 = @fullquery2 > 40 ? splice @fullquery2, 40 : @fullquery2;
+  my @query2 = @fullquery2 > 80 ? splice @fullquery2, 80 : @fullquery2;
 
   my $ml = "|MultiLabel 1 0";
+
+  %exdedup = ();
 
   while (@context || @query1 || @query2)
     {
