@@ -15,19 +15,15 @@
     [
       _privateInnards = [
          htm1 = prevState.h
-         hDim = prevState.dim
          dropx = if addDropout then Dropout (x) else x
 
-         Woh() = BS.Parameters.WeightParam (outputDim, hDim)
+         Woo() = BS.Parameters.WeightParam (outputDim, outputDim)
          Woi() = BS.Parameters.WeightParam (outputDim, inputDim)
          Bo () = BS.Parameters.BiasParam (outputDim)
-         Whh() = BS.Parameters.WeightParam (hDim, hDim)
-         Whi() = BS.Parameters.WeightParam (hDim, inputDim)
-         Bh () = BS.Parameters.BiasParam (hDim)
 
-         z = Sigmoid (Woh () * htm1 + Woi () * dropx + Bo ())
-         r = Sigmoid (Whh () * htm1 + Whi () * dropx + Bh ())
-         htilde = Tanh (Woh () * (r .* htm1) + Woi () * dropx + Bo ())
+         z = Sigmoid (Woo () * htm1 + Woi () * dropx + Bo ())
+         r = Sigmoid (Woo () * htm1 + Woi () * dropx + Bo ())
+         htilde = Tanh (Woo () * (r .* htm1) + Woi () * dropx + Bo ())
 
          ht = (Constant (1) - z) .* htm1 + z .* htilde
       ]
@@ -42,13 +38,12 @@
     [
         inputDim1 = inputDim ; layerIndex1 = layerIndex; addDropout1 = addDropout 
 
-        prevState = previousHook (gruState, layerIndex=layerIndex1) # recurrent memory. E.g. Previous or Next, with or without initial state, beam reordering etc.
+        prevState = previousHook (gruState, layerIndex=layerIndex1) 
 
         gruState = GRU (outputDim, x, inputDim=inputDim1, prevState, addDropout=addDropout1)
-    ].gruState // that's the value we return
+    ].gruState 
 
     # a stack of recurrent GRUs (bidirectional)
-    # TODO: Should we define layerDims as the total (sum of both forward and backward direction)?
     RecurrentBirectionalGRUStack (layerDims, input, inputDim=input.dim, previousHook=GRUPreviousHC, nextHook=GRUNextHC, addDropout=false) = [
         previousHook1 = previousHook ; nextHook1 = nextHook ; addDropout1 = addDropout
 
@@ -58,20 +53,19 @@
             vDim = if i == 0 then inputDim else layers[i-1].dim
 
             fwd = RecurrentGRU (layerDims[i], 
-                                  v, inputDim=vDim,
-                                  previousHook=previousHook1,
-                                  layerIndex=i, addDropout=addDropout1)
+                                v, inputDim=vDim,
+                                previousHook=previousHook1,
+                                layerIndex=i, addDropout=addDropout1)
             bwd = RecurrentGRU (layerDims[i], 
-                                  v, inputDim=vDim,
-                                  previousHook=nextHook1,
-                                  layerIndex=i, addDropout=addDropout1)
+                                v, inputDim=vDim,
+                                previousHook=nextHook1,
+                                layerIndex=i, addDropout=addDropout1)
             h = Splice ((fwd.h : bwd.h), axis=1)
             dim = layerDims[i] * 2  # output dimension
         ]
     ].layers
 
     # a stack of recurrent GRUs (biresidual)
-    # TODO: Should we define layerDims as the total (sum of both forward and backward direction)?
     RecurrentBiresidualGRUStack (layerDims, input, inputDim=input.dim, previousHook=GRUPreviousHC, nextHook=GRUNextHC, addDropout=false) = [
         previousHook1 = previousHook ; nextHook1 = nextHook ; addDropout1 = addDropout
 
