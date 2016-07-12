@@ -3,10 +3,15 @@
 ########################################################################
 
 ########################################################################
-#  (All clues, uniform average)
+#  (All clues, uniform average) <- maxlayer 1 (?)
 #  
 #  Finished Epoch[16 of 200]: [Training] ce = 0.01668583 * 15620; errs = 0.128% * 15620; totalSamplesSeen = 249920; learningRatePerSample = 0.0099999998; epochTime=3084.34s
 #  Finished Epoch[16 of 200]: [Validate] ce = 1.75745921 * 2368; errs = 35.051% * 2368
+#
+#  (attention maxlayer 0)
+#  Finished Epoch[17 of 200]: [Training] ce = 0.20320862 * 15620; errs = 3.995% * 15620; totalSamplesSeen = 265540; learningRatePerSample = 0.0309; epochTime=1932.54s
+#  Finished Epoch[17 of 200]: [Validate] ce = 1.24999697 * 2368; errs = 26.647% * 2368
+#
 ########################################################################
 
 RunRootDir = ".."      # default if not overridden
@@ -51,9 +56,8 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
   inputEmbedded = TransposeTimes (Einput, Word)
   net = RecurrentBiresidualGRUStack (netDims, inputEmbedded, inputDim=embeddingDim, addDropout=true)
   prenetOutput = net[Length (netDims) - 1].h
-#  attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
-#  attPre = FlattenDimensions (TransposeTimes (attV, prenetOutput), 1, 2)
-  attPre = BS.Constants.ZeroesLike (prenetOutput)
+  attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
+  attPre = FlattenDimensions (TransposeTimes (attV, prenetOutput), 1, 2)
   SoftMaxOverSequence (z) = [
     runningLogSum = BS.LogPlus (z, PastValue (0, runningLogSum, defaultHiddenActivation=-1e30))
     logSum = BS.Boolean.If (BS.Loop.IsLast (runningLogSum),    # if last entry
@@ -123,21 +127,15 @@ train = [
     keepCheckPointFiles = "false"
     maxEpochs = 200
     minibatchSize = 128
-    learningRatesPerSample = 0.05*15:0.01*50:0.005*50:0.001
+    learningRatesPerSample = 0.05
     momentumAsTimeConstant = 0
     dropoutRate = 0.5
     gradUpdateType = "None"
 
-#    # settings for Auto Adjust Learning Rate
-#    AutoAdjust = [
-#        autoAdjustLR = "adjustAfterEpoch"
-#        reduceLearnRateIfImproveLessThan = 0
-#        continueReduce = false
-#        increaseLearnRateIfImproveMoreThan = 1000000000
-#        learnRateDecreaseFactor = 0.5
-#        learnRateIncreaseFactor = 1.382
-#        learnRateAdjustInterval = 5
-#    ]
+    # settings for Auto Adjust Learning Rate
+    AutoAdjust = [
+        autoAdjustLR = "adjustAfterEpoch"
+    ]
   ]
 ]
 
