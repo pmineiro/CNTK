@@ -1,0 +1,93 @@
+    # helper function to delay h and c
+    # Callers can provide their own, e.g. useful for beam decoding.
+    GRUPreviousHC (lstmState, layerIndex=0) = [
+       h = BS.Loop.Previous (lstmState.h)         // hidden state(t-1)
+       dim = lstmState.dim
+    ]
+
+    # pass previousHook=BS.RNNs.NextHC instead of PreviousHC to get a right-to-left recurrence
+    GRUNextHC (lstmState, layerIndex=0) = [
+       h = BS.Loop.Next (lstmState.h)             // hidden state(t+1)
+       dim = lstmState.dim
+    ]
+
+    GRU (outputDim, x, inputDim=x.dim, prevState, addDropout=false) = 
+    [
+      _privateInnards = [
+         htm1 = prevState.h
+         dropx = if addDropout then Dropout (x) else x
+
+         Woo() = BS.Parameters.WeightParam (outputDim, outputDim)
+         Woi() = BS.Parameters.WeightParam (outputDim, inputDim)
+         Bo () = BS.Parameters.BiasParam (outputDim)
+
+         z = Sigmoid (Woo () * htm1 + Woi () * dropx + Bo ())
+         r = Sigmoid (Woo () * htm1 + Woi () * dropx + Bo ())
+         htilde = Tanh (Woo () * (r .* htm1) + Woi () * dropx + Bo ())
+
+         ht = (Constant (1) - z) .* htm1 + z .* htilde
+      ]
+
+      h = _privateInnards.ht
+      dim = outputDim
+    ]
+
+    RecurrentGRU (outputDim, x, inputDim=x.dim,
+                  previousHook=BS.RNNs.GRUPreviousHC,
+                  layerIndex=0, addDropout=false) =
+    [
+        inputDim1 = inputDim ; layerIndex1 = layerIndex; addDropout1 = addDropout 
+
+        prevState = previousHook (gruState, layerIndex=layerIndex1) 
+
+        gruState = GRU (outputDim, x, inputDim=inputDim1, prevState, addDropout=addDropout1)
+    ].gruState 
+
+    # a stack of recurrent GRUs (bidirectional)
+    RecurrentBirectionalGRUStack (layerDims, input, inputDim=input.dim, previousHook=GRUPreviousHC, nextHook=GRUNextHC, addDropout=false) = [
+        previousHook1 = previousHook ; nextHook1 = nextHook ; addDropout1 = addDropout
+
+        layers[i:0..Length (layerDims)-1] =
+        [
+            v    = if i == 0 then input    else layers[i-1].h
+            vDim = if i == 0 then inputDim else layers[i-1].dim
+
+            fwd = RecurrentGRU (layerDims[i], 
+                                v, inputDim=vDim,
+                                previousHook=previousHook1,
+                                layerIndex=i, addDropout=addDropout1)
+            bwd = RecurrentGRU (layerDims[i], 
+                                v, inputDim=vDim,
+                                previousHook=nextHook1,
+                                layerIndex=i, addDropout=addDropout1)
+            h = Splice ((fwd.h : bwd.h), axis=1)
+            dim = layerDims[i] * 2  # output dimension
+        ]
+    ].layers
+
+    # a stack of recurrent GRUs (biresidual)
+    RecurrentBiresidualGRUStack (layerDims, input, inputDim=input.dim, previousHook=GRUPreviousHC, nextHook=GRUNextHC, addDropout=false) = [
+        previousHook1 = previousHook ; nextHook1 = nextHook ; addDropout1 = addDropout
+
+        layers[i:0..Length (layerDims)-1] =
+        [
+            # residual variant of dropout ...
+
+            dropv = if i == 0 then if addDropout then Dropout (input) else input else layers[i-1].h
+            vDim = if i == 0 then inputDim else layers[i-1].dim
+
+            fwd = RecurrentGRU (layerDims[i], 
+                                dropv, inputDim=vDim,
+                                previousHook=previousHook1,
+                                layerIndex=i, addDropout=false)
+            bwd = RecurrentGRU (layerDims[i], 
+                                dropv, inputDim=vDim,
+                                previousHook=nextHook1,
+                                layerIndex=i, addDropout=false)
+
+            dropfh = if addDropout then Dropout (fwd.h) else fwd.h
+            dropbh = if addDropout then Dropout (bwd.h) else bwd.h
+            h = dropfh + dropbh + dropv
+            dim = layerDims[i] 
+        ]
+    ].layers
