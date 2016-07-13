@@ -72,19 +72,19 @@ include "grufactory.bs"
   # context GRU
   contextEmbedded = TransposeTimes (Einput, Context)
   contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded, addDropout=true)
-  contextOutput = Dropout (contextNet[Length (netDims) - 1].h)
+  contextOutput = contextNet[Length (netDims) - 1].h
   lastAvgContextNetOutput = AverageOverSequence (contextOutput)
 
   # query GRU
 
   queryEmbedded1 = TransposeTimes (Einput, Query1)
   queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1, addDropout=true)
-  queryOutput1 = Dropout (queryNet1[Length (netDims) - 1].h)
+  queryOutput1 = queryNet1[Length (netDims) - 1].h
   lastAvgQueryNetOutput1 = AverageOverSequence (queryOutput1)
 
   queryEmbedded2 = TransposeTimes (Einput, Query2)
   queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2, addDropout=true)
-  queryOutput2 = Dropout (queryNet2[Length (netDims) - 1].h)
+  queryOutput2 = queryNet2[Length (netDims) - 1].h
   lastAvgQueryNetOutput2 = AverageOverSequence (queryOutput2)
 
   # inner product similarity
