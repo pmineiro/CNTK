@@ -14,11 +14,12 @@ ExpId = ubuntu-3
 modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
 stderr     = "$OutDir$/$ExpId$/Ubuntu"
 
-vocabDim = 15915
+doQuadgram = false
+vocabDim = if doQuadgram then 16468 else 15915
+fileext = if doQuadgram then "quad" else "tri"
 hiddenDim = 320
 embeddingDim = 320
 maxLayer = 1
-useLast = false
 initLearningRate = 0.5
 dropoutRate = 0.0
 minibatchSize = 768
@@ -177,13 +178,14 @@ RecurrentBiresidualGRUStackInstantiate (factory,
   Query2 = Input (vocabDim, dynamicAxis=queryAxis2, tag='feature')
   MultiLabel = Input (2, tag='label')
 
-  # "averaging" network
+  # average (over dynamic axis) network
 
-  avgNet (in) = [
+  AverageOverSequence (in) = [
     mysum = in + PastValue (0, mysum, defaultHiddenActivation=0)
     mycount = BS.Constants.OnesLike (in) + PastValue (0, mycount, defaultHiddenActivation=0)
     myavg = ElementDivide (mysum, mycount)
-  ].myavg
+    out = BS.Sequences.Last (myavg)
+  ].out
 
   # tied parameters
   Einput = BS.Parameter ($vocabDim$, embeddingDim, init='gaussian')
@@ -193,29 +195,19 @@ RecurrentBiresidualGRUStackInstantiate (factory,
   contextEmbedded = TransposeTimes (Einput, Context)
   contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded, addDropout=true)
   contextOutput = Dropout (contextNet[Length (netDims) - 1].h)
-  lastAvgContextNetOutput = 
-    if $useLast$
-      then
-        BS.Sequences.Last (contextOutput)
-      else
-        [ 
-          avgContextNetOutput = avgNet (contextOutput)
-          out = BS.Sequences.Last (avgContextNetOutput)
-        ].out
+  lastAvgContextNetOutput = AverageOverSequence (contextOutput)
 
   # query GRU
 
   queryEmbedded1 = TransposeTimes (Einput, Query1)
   queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1, addDropout=true)
   queryOutput1 = Dropout (queryNet1[Length (netDims) - 1].h)
-  avgQueryNetOutput1 = avgNet (queryOutput1)
-  lastAvgQueryNetOutput1 = BS.Sequences.Last (avgQueryNetOutput1)
+  lastAvgQueryNetOutput1 = AverageOverSequence (queryOutput1)
 
   queryEmbedded2 = TransposeTimes (Einput, Query2)
   queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2, addDropout=true)
   queryOutput2 = Dropout (queryNet2[Length (netDims) - 1].h)
-  avgQueryNetOutput2 = avgNet (queryOutput2)
-  lastAvgQueryNetOutput2 = BS.Sequences.Last (avgQueryNetOutput2)
+  lastAvgQueryNetOutput2 = AverageOverSequence (queryOutput2)
 
   # inner product similarity
 
@@ -241,7 +233,7 @@ train = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3tri.megatrain"
+    file = "$DataDir$/shortubuntu3$fileext$.megatrain"
     randomize = "true"
 
     input = $globalInput$
@@ -249,7 +241,7 @@ train = [
 
   cvReader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3tri.valid"
+    file = "$DataDir$/shortubuntu3$fileext$.valid"
     randomize = "false"
 
     input = $globalInput$
@@ -285,7 +277,7 @@ test = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3tri.test"
+    file = "$DataDir$/shortubuntu3$fileext$.test"
     randomize = "false"
 
     input = $globalInput$
