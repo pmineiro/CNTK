@@ -9,8 +9,8 @@
 #  Finished Epoch[16 of 200]: [Validate] ce = 1.75745921 * 2368; errs = 35.051% * 2368
 #
 #  (attention maxlayer 0)
-#  Finished Epoch[17 of 200]: [Training] ce = 0.20320862 * 15620; errs = 3.995% * 15620; totalSamplesSeen = 265540; learningRatePerSample = 0.0309; epochTime=1932.54s
-#  Finished Epoch[17 of 200]: [Validate] ce = 1.24999697 * 2368; errs = 26.647% * 2368
+#  Finished Epoch[20 of 200]: [Training] ce = 0.04184388 * 15620; errs = 0.384% * 15620; totalSamplesSeen = 312400; learningRatePerSample = 0.011801452; epochTime=1954.55s
+#  Finished Epoch[20 of 200]: [Validate] ce = 1.21401321 * 2368; errs = 24.916% * 2368
 #
 ########################################################################
 
@@ -31,12 +31,18 @@ labelDim = 2370
 hiddenDim = 160
 embeddingDim = 160
 maxLayer = 0
+minibatchSize=128
+learningRatesPerSample = 0.05
+momentumPerMB = 0.0
+dropoutRate = 0.5
+restartFrom = "/dev/null"
 
 #---------------------------
 # network
 #---------------------------
-
-BrainScriptNetworkBuilder = (new ComputationNetwork [
+#
+BrainScriptNetworkBuilder = (if "$restartFrom$" == "/dev/null"
+then (new ComputationNetwork [
   include "GRU.bs"
 
   inputVocabDim = $inputVocabDim$
@@ -81,6 +87,9 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
   ce = CrossEntropyWithSoftmax (Answer, recPreSoftMax, tag='criterion')
   errs = ErrorPrediction (Answer, recPreSoftMax, tag='evaluation')
 ])
+else
+(BS.Network.Load ("$restartFrom$"))
+)
 
 train = [
   action = "train"
@@ -126,10 +135,10 @@ train = [
     epochSize = 0
     keepCheckPointFiles = "false"
     maxEpochs = 200
-    minibatchSize = 128
-    learningRatesPerSample = 0.05
-    momentumAsTimeConstant = 0
-    dropoutRate = 0.5
+    minibatchSize = $minibatchSize$
+    learningRatesPerSample = $learningRatesPerSample$
+    momentumPerMB = $momentumPerMB$
+    dropoutRate = $dropoutRate$
     gradUpdateType = "None"
 
     # settings for Auto Adjust Learning Rate
