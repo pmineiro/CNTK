@@ -14,9 +14,8 @@ ExpId = ubuntu-3
 modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
 stderr     = "$OutDir$/$ExpId$/Ubuntu"
 
-doQuadgram = false
-vocabDim = if doQuadgram then 16468 else 15915
-fileext = if doQuadgram then "quad" else "tri"
+fileext = "tri" # or "quad"
+vocabDim = 15915 # or 16468
 hiddenDim = 320
 embeddingDim = 320
 maxLayer = 1
