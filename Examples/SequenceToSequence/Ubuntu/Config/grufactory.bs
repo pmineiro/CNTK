@@ -2,35 +2,55 @@
 
 GRUPreviousHC (gruState) = [
    h = BS.Loop.Previous (gruState.h)         // hidden state(t-1)
+   x = h
 ]
 
 GRUNextHC (gruState) = [
    h = BS.Loop.Next (gruState.h)             // hidden state(t+1)
+   x = h
+]
+
+StrongPreviousHC (gruState) = [
+   h = BS.Loop.Previous (gruState.h)         // hidden state(t-1)
+   x = BS.Loop.Previous (gruState.xcopy)     // x(t-1)
+]
+
+StrongNextHC (gruState) = [
+   h = BS.Loop.Next (gruState.h)             // hidden state(t+1)
+   x = BS.Loop.Next (gruState.xcopy)         // x(t+1)
 ]
 
 GRUInstantiate (f, x, prevState) = [
   _privateInnards = [
      htprev = prevState.h
+     xtprev = prevState.x
 
-     z = Sigmoid (f.Zoo * htprev + f.Zoi * x + f.Zo);
-     r = Sigmoid (f.Roo * htprev + f.Roi * x + f.Ro);
-     htilde = Tanh (f.Hoo * (r .* htprev) + f.Hoi * x + f.Ho)
+     z = Sigmoid (f.Zoo * xtprev + f.Zoi * x + f.Zo);           // => f
+     prer = f.Roo * xtprev + f.Roi * x + f.Ro
+     r = if f.stronglyTyped then prer else Sigmoid (prer)       // => z
+     prehtilde = if f.stronglyTyped
+                 then f.Hoo * xtprev + f.Hoi * x + f.Ho
+                 else f.Hoo * (r .* htprev) + f.Hoi * x + f.Ho
+     htilde = Tanh (prehtilde)                                  // => o
 
-     ht = (Constant (1) - z) .* htilde + z .* htprev
+     // NB: Constant (0) required for dimensions to match in both cases :(
+     ht = if f.stronglyTyped 
+          then (Constant (0) + r) .* htilde + z .* htprev
+          else (Constant (1) - z) .* htilde + z .* htprev
   ]
 
   h = _privateInnards.ht
+  xcopy = x
   dim = f.outputDim
 ]
 
-RecurrentGRUInstantiate (factory, 
-                         x,
-                         previousHook=GRUPreviousHC) = [
+RecurrentGRUInstantiate (factory, x, previousHook) = [
   prevState = previousHook (gruState)
   gruState = GRUInstantiate (factory, x, prevState)
 ].gruState
 
-RecurrentGRUFactory (outputDim, inputDim) = [
+RecurrentGRUFactory (outputDim, inputDim, stronglyTyped) = [
+  stronglyTyped1 = stronglyTyped
   Woo() = BS.Parameters.WeightParam (outputDim, outputDim)
   Woi() = BS.Parameters.WeightParam (outputDim, inputDim)
   Bo () = BS.Parameters.BiasParam (outputDim)
@@ -42,10 +62,11 @@ RecurrentGRUFactory (outputDim, inputDim) = [
 
      inputDim = inputDim
      outputDim = outputDim
+     stronglyTyped = stronglyTyped1
   ]
 ].res
 
-RecurrentBiresidualGRUStackFactory (layerDims, inputDim) = [
+RecurrentBiresidualGRUStackFactory (layerDims, inputDim, stronglyTyped=false) = [
   layerDims1 = layerDims
   inputDim1 = inputDim
 
@@ -53,8 +74,8 @@ RecurrentBiresidualGRUStackFactory (layerDims, inputDim) = [
     factories[i:0..Length (layerDims)-1] = [
       vDim = if i == 0 then inputDim else factories[i-1].dim
 
-      fwd = RecurrentGRUFactory (layerDims[i], vDim)
-      bwd = RecurrentGRUFactory (layerDims[i], vDim)
+      fwd = RecurrentGRUFactory (layerDims[i], vDim, stronglyTyped)
+      bwd = RecurrentGRUFactory (layerDims[i], vDim, stronglyTyped)
       dim = layerDims[i]
     ]
 
@@ -63,23 +84,25 @@ RecurrentBiresidualGRUStackFactory (layerDims, inputDim) = [
   ]
 ].res
 
-RecurrentBiresidualGRUStackInstantiate (factory,
-                                        input, 
-                                        previousHook=GRUPreviousHC,
-                                        nextHook=GRUNextHC,
-                                        addDropout=false) = [
-  previousHook1 = previousHook ; nextHook1 = nextHook ; 
-
+RecurrentBiresidualGRUStackInstantiate (factory, input, addDropout=false) = [
   layers[i:0..Length (factory.layerDims)-1] = [
     dropInput = if i == 0 then if addDropout then Dropout (input) else input else layers[i-1].h
 
+    previousHook = if factory.stronglyTyped 
+                   then StrongPreviousHC 
+                   else GRUPreviousHC
+
+    nextHook = if factory.stronglyTyped 
+               then StrongNextHC 
+               else GRUNextHC
+
     fwd = RecurrentGRUInstantiate (factory.factories[i].fwd,
                                    dropInput,
-                                   previousHook=previousHook1)
+                                   previousHook)
 
     bwd = RecurrentGRUInstantiate (factory.factories[i].bwd,
                                    dropInput,
-                                   previousHook=nextHook1)
+                                   nextHook)
 
     dropfh = if addDropout then Dropout (fwd.h) else fwd.h
     dropbh = if addDropout then Dropout (bwd.h) else bwd.h
