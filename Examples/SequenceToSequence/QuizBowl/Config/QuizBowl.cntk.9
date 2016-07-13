@@ -31,12 +31,18 @@ labelDim = 2370
 hiddenDim = 160
 embeddingDim = 160
 maxLayer = 0
+minibatchSize=128
+learningRatesPerSample = 0.05
+momentumPerMB = 0.0
+dropoutRate = 0.5
+restartFrom = "/dev/null"
 
 #---------------------------
 # network
 #---------------------------
-
-BrainScriptNetworkBuilder = (new ComputationNetwork [
+#
+BrainScriptNetworkBuilder = (if "$restartFrom$" == "/dev/null"
+then (new ComputationNetwork [
   include "GRU.bs"
 
   inputVocabDim = $inputVocabDim$
@@ -81,6 +87,9 @@ BrainScriptNetworkBuilder = (new ComputationNetwork [
   ce = CrossEntropyWithSoftmax (Answer, recPreSoftMax, tag='criterion')
   errs = ErrorPrediction (Answer, recPreSoftMax, tag='evaluation')
 ])
+else
+(BS.Network.Load ("$restartFrom$"))
+)
 
 train = [
   action = "train"
@@ -126,10 +135,10 @@ train = [
     epochSize = 0
     keepCheckPointFiles = "false"
     maxEpochs = 200
-    minibatchSize = 128
-    learningRatesPerSample = 0.05
-    momentumAsTimeConstant = 0
-    dropoutRate = 0.5
+    minibatchSize = $minibatchSize$
+    learningRatesPerSample = $learningRatesPerSample$
+    momentumPerMB = $momentumPerMB$
+    dropoutRate = $dropoutRate$
     gradUpdateType = "None"
 
     # settings for Auto Adjust Learning Rate
