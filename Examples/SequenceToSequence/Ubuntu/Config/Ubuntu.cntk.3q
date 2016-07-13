@@ -1,5 +1,5 @@
 ########################################################################
-# trigram variant
+# quadgram variant
 ########################################################################
 
 RunRootDir = ".."      # default if not overridden
@@ -14,7 +14,7 @@ ExpId = ubuntu-3
 modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
 stderr     = "$OutDir$/$ExpId$/Ubuntu"
 
-vocabDim = 15915
+vocabDim = 16468
 hiddenDim = 320
 embeddingDim = 320
 maxLayer = 1
@@ -241,7 +241,7 @@ train = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3tri.megatrain"
+    file = "$DataDir$/shortubuntu3quad.megatrain"
     randomize = "true"
 
     input = $globalInput$
@@ -249,7 +249,7 @@ train = [
 
   cvReader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3tri.valid"
+    file = "$DataDir$/shortubuntu3quad.valid"
     randomize = "false"
 
     input = $globalInput$
@@ -285,7 +285,7 @@ test = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3tri.test"
+    file = "$DataDir$/shortubuntu3quad.test"
     randomize = "false"
 
     input = $globalInput$
