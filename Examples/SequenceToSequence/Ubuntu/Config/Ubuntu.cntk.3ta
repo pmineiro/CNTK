@@ -74,34 +74,38 @@ include "grufactory.bs"
     result = Exp (z - logSum)
   ].result
 
+  # softmax weighted average (over dynamic axis) network
+
+  SoftMaxAverageOverSequence (attW, z) = [
+    attPre = FlattenDimensions (TransposeTimes (attW, z), 1, 2)
+    att = SoftMaxOverSequence (attPre)
+    attZ = ElementTimes (att, z)
+    mysum = attZ + PastValue (0, mysum, defaultHiddenActivation=0)
+    out = BS.Sequences.Last (mysum)
+  ].out
+
   # tied parameters
-  Einput = BS.Parameter ($vocabDim$, embeddingDim, init='gaussian')
+  Einput = BS.Parameter (vocabDim, embeddingDim, init='gaussian')
   Factory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim)
+  attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
 
   # context GRU
   contextEmbedded = TransposeTimes (Einput, Context)
   contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded, addDropout=true)
-  precontextOutput = contextNet[Length (netDims) - 1].h
-  attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
-  attPre = FlattenDimensions (TransposeTimes (attV, precontextOutput), 1, 2)
-  attSoft = SoftMaxOverSequence (attPre)
-  weightedContextOutput = ElementTimes (attSoft, precontextOutput)
-  lastAvgContextNetOutput = [
-    mysum = weightedContextOutput + PastValue (0, mysum, defaultHiddenActivation=0)
-    out = BS.Sequences.Last (mysum)
-  ].out
+  contextOutput = contextNet[Length (netDims) - 1].h
+  lastAvgContextNetOutput = SoftMaxAverageOverSequence (attV, contextOutput)
 
   # query GRU
 
   queryEmbedded1 = TransposeTimes (Einput, Query1)
   queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1, addDropout=true)
   queryOutput1 = queryNet1[Length (netDims) - 1].h
-  lastAvgQueryNetOutput1 = AverageOverSequence (queryOutput1)
+  lastAvgQueryNetOutput1 = SoftMaxAverageOverSequence (attV, queryOutput1)
 
   queryEmbedded2 = TransposeTimes (Einput, Query2)
   queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2, addDropout=true)
   queryOutput2 = queryNet2[Length (netDims) - 1].h
-  lastAvgQueryNetOutput2 = AverageOverSequence (queryOutput2)
+  lastAvgQueryNetOutput2 = SoftMaxAverageOverSequence (attV, queryOutput2)
 
   # inner product similarity
 
