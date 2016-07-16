@@ -1,5 +1,11 @@
 ########################################################################
 # trigram variant, with attention 
+# 
+# no zoneout, dropout=0.2: 
+# 19+...
+# Finished Epoch[ 4 of 200]: [Training] ce = 0.22072354 * 200000; errs = 9.290% * 200000; totalSamplesSeen = 800000; learningRatePerSample = 9.3243162e-07; epochTime=2267.51s
+# Finished Epoch[ 4 of 200]: [Validate] ce = 0.45519607 * 19560; errs = 16.017% * 19560
+#
 ########################################################################
 
 RunRootDir = ".."      # default if not overridden
@@ -87,24 +93,24 @@ include "grufactory.bs"
 
   # tied parameters
   Einput = BS.Parameter (vocabDim, embeddingDim, init='gaussian')
-  Factory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim, stronglyTyped=$stronglyTyped$)
+  Factory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim, stronglyTyped=$stronglyTyped$, addDropout=true, addZoneout=true)
   attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
 
   # context GRU
   contextEmbedded = TransposeTimes (Einput, Context)
-  contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded, addDropout=true)
+  contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded)
   contextOutput = contextNet[Length (netDims) - 1].h
   lastAvgContextNetOutput = SoftMaxAverageOverSequence (attV, contextOutput)
 
   # query GRU
 
   queryEmbedded1 = TransposeTimes (Einput, Query1)
-  queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1, addDropout=true)
+  queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1)
   queryOutput1 = queryNet1[Length (netDims) - 1].h
   lastAvgQueryNetOutput1 = SoftMaxAverageOverSequence (attV, queryOutput1)
 
   queryEmbedded2 = TransposeTimes (Einput, Query2)
-  queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2, addDropout=true)
+  queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2)
   queryOutput2 = queryNet2[Length (netDims) - 1].h
   lastAvgQueryNetOutput2 = SoftMaxAverageOverSequence (attV, queryOutput2)
 

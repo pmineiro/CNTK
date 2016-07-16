@@ -68,23 +68,23 @@ include "grufactory.bs"
 
   # tied parameters
   Einput = BS.Parameter ($vocabDim$, embeddingDim, init='gaussian')
-  Factory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim, stronglyTyped=$stronglyTyped$)
+  Factory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim, stronglyTyped=$stronglyTyped$, addDropout=true, addZoneout=true)
 
   # context GRU
   contextEmbedded = TransposeTimes (Einput, Context)
-  contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded, addDropout=true)
+  contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded)
   contextOutput = contextNet[Length (netDims) - 1].h
   lastAvgContextNetOutput = AverageOverSequence (contextOutput)
 
   # query GRU
 
   queryEmbedded1 = TransposeTimes (Einput, Query1)
-  queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1, addDropout=true)
+  queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1)
   queryOutput1 = queryNet1[Length (netDims) - 1].h
   lastAvgQueryNetOutput1 = AverageOverSequence (queryOutput1)
 
   queryEmbedded2 = TransposeTimes (Einput, Query2)
-  queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2, addDropout=true)
+  queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2)
   queryOutput2 = queryNet2[Length (netDims) - 1].h
   lastAvgQueryNetOutput2 = AverageOverSequence (queryOutput2)
 
