@@ -30,7 +30,6 @@ dropoutRate = 0.0
 minibatchSize = 768
 momentum = 0.9
 restartFrom = "/dev/null"
-stronglyTyped = false
 
 globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Query1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2 = [ dim = "$vocabDim$"; format = "sparse" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
 
@@ -93,7 +92,7 @@ include "grufactory.bs"
 
   # tied parameters
   Einput = BS.Parameter (vocabDim, embeddingDim, init='gaussian')
-  Factory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim, stronglyTyped=$stronglyTyped$, addDropout=true, addZoneout=true)
+  Factory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim, addDropout=true, addZoneout=true)
   attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
 
   # context GRU
