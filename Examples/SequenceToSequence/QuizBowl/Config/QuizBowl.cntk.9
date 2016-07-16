@@ -13,8 +13,9 @@
 #  Finished Epoch[20 of 200]: [Validate] ce = 1.21401321 * 2368; errs = 24.916% * 2368
 #
 #  (attention maxlayer 1)
-#  Finished Epoch[25 of 200]: [Training] ce = 0.56541581 * 15620; errs = 14.667% * 15620; totalSamplesSeen = 390500; learningRatePerSample = 0.011801452; epochTime=3536.02s
-#  Finished Epoch[25 of 200]: [Validate] ce = 1.23409608 * 2368; errs = 23.100% * 2368
+# Finished Epoch[30 of 200]: [Training] ce = 0.40486634 * 15620; errs = 10.691% * 15620; totalSamplesSeen = 468600; learningRatePerSample = 0.011801452; epochTime=3264.13s
+# Finished Epoch[30 of 200]: [Validate] ce = 1.14176705 * 2368; errs = 20.608% * 2368
+# 
 #
 ########################################################################
 
@@ -65,9 +66,9 @@ then (new ComputationNetwork [
   Einput = BS.Parameters.WeightParam ($inputVocabDim$, embeddingDim)
   inputEmbedded = TransposeTimes (Einput, Word)
   net = RecurrentBiresidualGRUStack (netDims, inputEmbedded, inputDim=embeddingDim, addDropout=true)
-  prenetOutput = net[Length (netDims) - 1].h
+  netOutput = net[Length (netDims) - 1].h
   attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
-  attPre = FlattenDimensions (TransposeTimes (attV, prenetOutput), 1, 2)
+  attPre = FlattenDimensions (TransposeTimes (attV, netOutput), 1, 2)
   SoftMaxOverSequence (z) = [
     runningLogSum = BS.LogPlus (z, PastValue (0, runningLogSum, defaultHiddenActivation=-1e30))
     logSum = BS.Boolean.If (BS.Loop.IsLast (runningLogSum),    # if last entry
@@ -76,8 +77,7 @@ then (new ComputationNetwork [
     result = Exp (z - logSum)
   ].result
   attSoft = SoftMaxOverSequence (attPre)
-  netOutput = Dropout (prenetOutput)
-  weightedNetOutput = ElementTimes (attSoft, netOutput)
+  weightedNetOutput = ElementTimes (attSoft, Dropout (netOutput))
   avgNetOutput = [
     mysum = weightedNetOutput + PastValue (0, mysum, defaultHiddenActivation=0)
   ].mysum
