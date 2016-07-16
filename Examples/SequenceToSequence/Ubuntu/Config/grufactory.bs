@@ -33,10 +33,11 @@ GRUInstantiate (f, x, prevState) = [
                  else f.Hoo * (r .* htprev) + f.Hoi * x + f.Ho
      htilde = Tanh (prehtilde)                                  // => o
 
-     // NB: Constant (0) required for dimensions to match in both cases :(
-     ht = if f.stronglyTyped 
-          then (Constant (0) + r) .* htilde + z .* htprev
-          else (Constant (1) - z) .* htilde + z .* htprev
+     deltaht = if f.stronglyTyped
+               then (Constant (0) + r) .* htilde + (Constant(1) - z) .* htprev
+               else (Constant (1) - z) .* (htilde - htprev)
+
+     ht = htprev + if f.addZoneout then Dropout (deltaht) else deltaht
   ]
 
   h = _privateInnards.ht
@@ -49,8 +50,14 @@ RecurrentGRUInstantiate (factory, x, previousHook) = [
   gruState = GRUInstantiate (factory, x, prevState)
 ].gruState
 
-RecurrentGRUFactory (outputDim, inputDim, stronglyTyped) = [
-  stronglyTyped1 = stronglyTyped
+RecurrentGRUFactory (outputDim,
+                     inputDim,
+                     stronglyTyped=false,
+                     addDropout=false,
+                     addZoneout=false) = [
+  stronglyTyped1 = stronglyTyped ; addZoneout1 = addZoneout
+  addDropout1 = addDropout
+
   Woo() = BS.Parameters.WeightParam (outputDim, outputDim)
   Woi() = BS.Parameters.WeightParam (outputDim, inputDim)
   Bo () = BS.Parameters.BiasParam (outputDim)
@@ -63,19 +70,34 @@ RecurrentGRUFactory (outputDim, inputDim, stronglyTyped) = [
      inputDim = inputDim
      outputDim = outputDim
      stronglyTyped = stronglyTyped1
+     addZoneout = addZoneout1
+     addDropout = addDropout1
   ]
 ].res
 
-RecurrentBiresidualGRUStackFactory (layerDims, inputDim, stronglyTyped=false) = [
-  layerDims1 = layerDims
-  inputDim1 = inputDim
+RecurrentBiresidualGRUStackFactory (layerDims, 
+                                    inputDim, 
+                                    stronglyTyped=false,
+                                    addDropout=false,
+                                    addZoneout=false) = [
+  layerDims1 = layerDims ; inputDim1 = inputDim
+  stronglyTyped1 = stronglyTyped ; addZoneout1 = addZoneout 
+  addDropout1 = addDropout
 
   res = [
     factories[i:0..Length (layerDims)-1] = [
       vDim = if i == 0 then inputDim else factories[i-1].dim
 
-      fwd = RecurrentGRUFactory (layerDims[i], vDim, stronglyTyped)
-      bwd = RecurrentGRUFactory (layerDims[i], vDim, stronglyTyped)
+      fwd = RecurrentGRUFactory (layerDims[i],
+                                 vDim,
+                                 stronglyTyped=stronglyTyped1, 
+                                 addDropout=addDropout1,
+                                 addZoneout=addZoneout1)
+      bwd = RecurrentGRUFactory (layerDims[i], 
+                                 vDim,
+                                 stronglyTyped=stronglyTyped1, 
+                                 addDropout=addDropout1,
+                                 addZoneout=addZoneout1)
       dim = layerDims[i]
     ]
 
@@ -84,29 +106,33 @@ RecurrentBiresidualGRUStackFactory (layerDims, inputDim, stronglyTyped=false) = 
   ]
 ].res
 
-RecurrentBiresidualGRUStackInstantiate (factory, input, addDropout=false) = [
-  layers[i:0..Length (factory.layerDims)-1] = [
-    dropInput = if i == 0 then if addDropout then Dropout (input) else input else layers[i-1].h
+RecurrentBiresidualGRUStackInstantiate (f, input) = [
+  layers[i:0..Length (f.layerDims)-1] = [
+    dropInput = if i == 0 
+                then if f.addDropout 
+                     then Dropout (input) 
+                     else input 
+                else layers[i-1].h
 
-    previousHook = if factory.stronglyTyped 
+    previousHook = if f.stronglyTyped 
                    then StrongPreviousHC 
                    else GRUPreviousHC
 
-    nextHook = if factory.stronglyTyped 
+    nextHook = if f.stronglyTyped 
                then StrongNextHC 
                else GRUNextHC
 
-    fwd = RecurrentGRUInstantiate (factory.factories[i].fwd,
+    fwd = RecurrentGRUInstantiate (f.factories[i].fwd,
                                    dropInput,
                                    previousHook)
 
-    bwd = RecurrentGRUInstantiate (factory.factories[i].bwd,
+    bwd = RecurrentGRUInstantiate (f.factories[i].bwd,
                                    dropInput,
                                    nextHook)
 
-    dropfh = if addDropout then Dropout (fwd.h) else fwd.h
-    dropbh = if addDropout then Dropout (bwd.h) else bwd.h
+    dropfh = if f.addDropout then Dropout (fwd.h) else fwd.h
+    dropbh = if f.addDropout then Dropout (bwd.h) else bwd.h
     h = dropfh + dropbh + dropInput
-    dim = factory.layerDims[i] 
+    dim = f.layerDims[i] 
   ]
 ].layers
