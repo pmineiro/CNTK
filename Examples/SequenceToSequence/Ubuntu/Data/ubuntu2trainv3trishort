@@ -7,6 +7,10 @@ use Text::CSV;
 use Data::Dumper;
 
 my $mode = shift @ARGV or die;
+my $vocabfile = shift @ARGV or die;
+my $maxsid = shift @ARGV or die;
+my $numchars = shift @ARGV or die; # trigrams = 2, quadgrams = 3, etc.
+my $ntk = shift @ARGV or die; 
 
 sub save_hash ($$)
 {
@@ -99,8 +103,6 @@ sub process ($$)
   my @morpho = morphofeatures ($fulls, $codec);
   push @morpho, join ":", encode ($s, $codec), "1";
 
-  my $numchars = 2; # trigrams = 2, quadgrams = 3, etc.
-
   my @chars = split //, $s;
   do
     {
@@ -164,11 +166,11 @@ sub printexample ($$$$)
   my ($sid, $context, $query1, $query2) = @_;
 
   my @fullcontext = tokenize $context;
-  my @context = @fullcontext > 60 ? splice @fullcontext, -60 : @fullcontext;
+  my @context = @fullcontext > $ntk ? splice @fullcontext, -$ntk : @fullcontext;
   my @fullquery1 = tokenize $query1;
-  my @query1 = @fullquery1 > 60 ? splice @fullquery1, 60 : @fullquery1;
+  my @query1 = @fullquery1 > $ntk ? splice @fullquery1, $ntk : @fullquery1;
   my @fullquery2 = tokenize $query2;
-  my @query2 = @fullquery2 > 60 ? splice @fullquery2, 60 : @fullquery2;
+  my @query2 = @fullquery2 > $ntk ? splice @fullquery2, $ntk : @fullquery2;
 
   my $ml = "|MultiLabel 1 0";
 
@@ -188,8 +190,6 @@ sub printexample ($$$$)
 
 #----------------------------------------------------------------
 
-my $vocabfile = "shortvocab3tri";
-
 load_hash ($vocabfile, \%vocab);
 
 my $csv = Text::CSV->new ({ binary => 1 }) or die Text::CSV->error_diag ();
@@ -198,7 +198,6 @@ my $csv = Text::CSV->new ({ binary => 1 }) or die Text::CSV->error_diag ();
 <>;
 
 my $sid = 1;
-my $maxsid = $mode eq "megatrain" || $mode eq "preprocess" ? 200000 : 20000;
 my @positives;
 my @negatives;
 

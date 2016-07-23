@@ -99,7 +99,7 @@ sub process ($$)
   my @morpho = morphofeatures ($fulls, $codec);
   push @morpho, join ":", encode ($s, $codec), "1";
 
-  my $numchars = 3; # trigrams = 2, quadgrams = 3, etc.
+  my $numchars = 2; # trigrams = 2, quadgrams = 3, etc.
 
   my @chars = split //, $s;
   do
@@ -198,7 +198,8 @@ my $csv = Text::CSV->new ({ binary => 1 }) or die Text::CSV->error_diag ();
 <>;
 
 my $sid = 1;
-my $maxsid = $mode eq "megatrain" || $mode eq "preprocess" ? 200000 : 20000;
+#my $maxsid = $mode eq "megatrain" || $mode eq "preprocess" ? 200000 : 20000;
+my $maxsid = 100000000;
 my @positives;
 my @negatives;
 

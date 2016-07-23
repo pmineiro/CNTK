@@ -1,5 +1,8 @@
 .SECONDARY:
 
+ntk:=100
+maxsid:=10000000
+
 all: ubuntu3.megatrain ubuntu3.valid ubuntu3.test
 
 shortvocab4: megatrain.csv ubuntu2trainv4short
@@ -8,17 +11,25 @@ shortvocab4: megatrain.csv ubuntu2trainv4short
 shortubuntu4.%: %.csv ubuntu2trainv4short shortvocab4
 	perl ./$(word 2,$^) $* $< > $@
 
-shortvocab3quad: megatrain.csv ubuntu2trainv3quadshort
-	perl ./$(word 2,$^) preprocess $< > /dev/null
+shortvocab3quad: megatrain.csv ubuntu2trainv3trishort
+	perl ./$(word 2,$^) preprocess $@ $(maxsid) 3 $(ntk) $< > /dev/null
 
-shortubuntu3quad.%: %.csv ubuntu2trainv3quadshort shortvocab3quad
-	perl ./$(word 2,$^) $* $< > $@
+shortubuntu3quad.%: %.csv ubuntu2trainv3trishort shortvocab3quad
+	perl ./$(word 2,$^) $* $(word 3,$^) $(maxsid) 3 $(ntk) $< > $@
+
+shortvocab3trimega: ntk=160
+shortvocab3trimega: megatrain.csv ubuntu2trainv3trishort
+	perl ./$(word 2,$^) preprocess $@ $(maxsid) 2 $(ntk) $< > /dev/null
+
+shortubuntu3trimega.%: ntk=160
+shortubuntu3trimega.%: %.csv ubuntu2trainv3trishort shortvocab3trimega
+	perl ./$(word 2,$^) $* $(word 3,$^) $(maxsid) 2 $(ntk) $< > $@
 
 shortvocab3tri: megatrain.csv ubuntu2trainv3trishort
-	perl ./$(word 2,$^) preprocess $< > /dev/null
+	perl ./$(word 2,$^) preprocess $@ $(maxsid) 2 $(ntk) $< > /dev/null
 
 shortubuntu3tri.%: %.csv ubuntu2trainv3trishort shortvocab3tri
-	perl ./$(word 2,$^) $* $< > $@
+	perl ./$(word 2,$^) $* $(word 3,$^) $(maxsid) 2 $(ntk) $< > $@
 
 shortvocab3: megatrain.csv ubuntu2trainv3short
 	perl ./$(word 2,$^) preprocess $< > /dev/null
