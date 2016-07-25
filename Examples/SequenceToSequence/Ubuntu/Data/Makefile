@@ -3,7 +3,7 @@
 ntk:=100
 maxsid:=10000000
 
-all: ubuntu3.megatrain ubuntu3.valid ubuntu3.test
+all: shortubuntu3tri.megatrain shortubuntu3tri.valid shortubuntu3tri.test
 
 shortvocab4: megatrain.csv ubuntu2trainv4short
 	perl ./$(word 2,$^) preprocess $< > /dev/null

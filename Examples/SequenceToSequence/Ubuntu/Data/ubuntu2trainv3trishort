@@ -174,8 +174,6 @@ sub printexample ($$$$)
 
   my $ml = "|MultiLabel 1 0";
 
-  %exdedup = ();
-
   while (@context || @query1 || @query2)
     {
       my $ct1 = @context ? "|Context @{[features (shift @context, \%trimemo, \%vocab)]}" : "";
@@ -201,13 +199,18 @@ my $sid = 1;
 my @positives;
 my @negatives;
 
-while (my $row = $csv->getline (*ARGV))
+LINE: while (my $row = $csv->getline (*ARGV))
   {
     my @fields = @$row;
 
-    printexample ($sid, $fields[0], $fields[1], $fields[2]);
-
-    last if ++$sid > $maxsid;
+    %exdedup = ();
+    my $maxfield = ($mode eq "preprocess" || $mode eq "megatrain") ? $#fields
+                                                                   : 2;
+    foreach my $col (2 .. $maxfield)
+      {
+        printexample ($sid, $fields[0], $fields[1], $fields[$col]);
+        last LINE if ++$sid > $maxsid;
+      }
   }
 
 save_hash ($vocabfile, \%vocab);
