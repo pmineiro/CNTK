@@ -1,0 +1,1 @@
+ls -o Out/**/*.dnn* | perl -lane 'print $F[-1]' | sort -ru | perl -lne 'chomp; m%(.*).ckp% && do { $s{$1}++; next; }; print $_ unless $s{$_};' #| xargs rm
