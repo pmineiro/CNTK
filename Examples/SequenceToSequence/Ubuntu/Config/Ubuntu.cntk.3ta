@@ -36,6 +36,7 @@ minibatchSize = 768
 momentum = 0.9
 restartFrom = "/dev/null"
 addZoneout = false
+maxEpochs = 200
 
 globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Query1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2 = [ dim = "$vocabDim$"; format = "sparse" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
 
@@ -161,7 +162,7 @@ train = [
     modelPath = "$modelPath$"
     epochSize = 0
     keepCheckPointFiles = "false"
-    maxEpochs = 200
+    maxEpochs = $maxEpochs$
     minibatchSize = $minibatchSize$
     learningRatesPerMB = $initLearningRate$
     momentumPerMB = $momentum$

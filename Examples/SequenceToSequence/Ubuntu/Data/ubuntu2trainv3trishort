@@ -11,6 +11,7 @@ my $vocabfile = shift @ARGV or die;
 my $maxsid = shift @ARGV or die;
 my $numchars = shift @ARGV or die; # trigrams = 2, quadgrams = 3, etc.
 my $ntk = shift @ARGV or die; 
+my $tokencutoff = shift @ARGV or die;
 
 sub save_hash ($$)
 {
@@ -25,7 +26,7 @@ sub save_hash ($$)
       while (my ($k, $v) = each %$hash)
         {
           my (undef, $c) = @$v;
-          do { print $fh "$k\t$index\t$c\n"; ++$index; } if $c > 2;
+          do { print $fh "$k\t$index\t$c\n"; ++$index; } if $c > $tokencutoff;
         }
     }
 }

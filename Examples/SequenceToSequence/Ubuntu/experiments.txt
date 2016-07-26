@@ -1,3 +1,5 @@
+5Ia -> 3Ia++f, x2 with max
+
 3 -> short ubuntu 3, tied parameters, maxLayer=0, eDim=224 (17/26 @ 7, stuck)
 3a -> short ubuntu 3, tied parameters, maxLayer=0, eDim=288 (19/26 @ 6)
 3b -> short ubuntu 3, tied parameters, maxLayer=0, eDim=256 (15/24 @ 11, stuck)
@@ -36,20 +38,23 @@
 3I -> short ubuntu 3, tp, mL=1, eDim=384/0.2, c=q=60, trigram+head (13/16.95 @ 14 + 8)
 3J -> short ubuntu 3, tp, mL=1, eDim=320, c=q=80, trigram+head (6/16 @ 16)
   3Jf: ibid, full dataset: 9.4/11.1 @ 12 + 4 + 4
-  3J+f: ibid, c=q=100, full dataset: 11.8/12.0 @ 11 + ...
+  3J+f: ibid, c=q=100, full dataset: 10.1/11.1 @ 11 + 2 
 3K -> short ubuntu 3, tp, mL=1, eDim=384/0.2, c=q=80, trigram+head (13/17 @ 18)
 
 3Ga -> short 3, tp, mL=1, eDim=320, c=q=60, t+h, c-att (4/17 @ 14)
 3Ia -> short 3, tp, mL=1, eDim=384/0.2, c=q=60, t+h, c-att (17/19 @ 10)
   redo w/sane dropout: 9/16 @ 19 + ... 9/16 @ 19+5
-    (chonto) Iaf: ibid, full dataset, c=q=80: 10.6/10.1 @ 10 + 7 + 2
+    (chonto) Iaf: ibid, full dataset, c=q=80, c-q-att: 10.6/10.1 @ 10 + 7 + 2
+(*) (chonto) Ia+f: ibid, full dataset x2: 9.8/9.2 @ 8 ...
+       (gcr) Ia++f: ibid, full dataset x9: ...
+        (g2) Ia++xf: ibid, c=q=160, mincount=2: ...
     IaS: ibid, strongly typed: 13/20 @ 19 + 4 (strongly flass)
            IaSa: ibid, mL=2: 15/21 @ 22 (still strongly flass)
       Iaz plus zoneout: 15/18.9 @ 17 + 1
       Ibz plus extra dropout nodes: 16.4/19.4 @ 18 + 3
-        (*) Ib without zoneout: 9.2/16.4 @ 15 + 7
-          Ibf: ibid, full dataset, c=q=80: 13.5/11.5 @ 9 + ...
-          Ib+f: ibid, full dataset, c=q=100: 13.9/11.5 @ 7 ...
+          Ib without zoneout: 9.2/16.4 @ 15 + 7
+          Ibf: ibid, full dataset, c=q=80, dropout=0.1: 10.3/10.8 @ 9 + 4 
+          Ib+f: ibid, full dataset, c=q=100: 11.1/10.7 @ 7 + 6
         Icz: ibid, eDim=480/0.2: 17/20 @ 12 + 1
 
 4 -> short ubuntu 4, tied parameters, maxLayer=0, eDim=160 (81/85 @ 10)
