@@ -79,7 +79,7 @@ RecurrentBiresidualGRUStackFactory (layerDims,
   ]
 ].res
 
-RecurrentBiresidualGRUStackInstantiate (f, input) = [
+RecurrentBiresidualGRUStackInstantiate (f, input, passthrough=true) = [
   layers[i:0..Length (f.layerDims)-1] = [
     dropInput = if i == 0 
                 then if f.addDropout 
@@ -97,7 +97,9 @@ RecurrentBiresidualGRUStackInstantiate (f, input) = [
 
     dropfh = if f.addDropout then Dropout (fwd.h) else fwd.h
     dropbh = if f.addDropout then Dropout (bwd.h) else bwd.h
-    h = dropfh + dropbh + dropInput
+    h = if passthrough
+        then dropfh + dropbh + dropInput
+        else dropfh + dropbh 
     dim = f.layerDims[i] 
   ]
 ].layers

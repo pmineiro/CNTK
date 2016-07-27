@@ -37,6 +37,8 @@ momentum = 0.5:0.9
 restartFrom = "/dev/null"
 addZoneout = false
 maxEpochs = 200
+useAttention = true
+usePassthrough = true
 
 globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Query1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2 = [ dim = "$vocabDim$"; format = "sparse" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
 
@@ -100,23 +102,25 @@ include "grufactory.bs"
   # tied parameters
   Einput = BS.Parameter (vocabDim, embeddingDim, init='gaussian')
   Factory = RecurrentBiresidualGRUStackFactory (netDims, embeddingDim, addDropout=true, addZoneout=$addZoneout$)
-  attV = Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
+  attV = if $useAttention$ 
+         then Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
+         else BS.ConstantTensor (0, (hiddenDim : 1))
 
   # context GRU
   contextEmbedded = TransposeTimes (Einput, Context)
-  contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded)
+  contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded, passthrough=$usePassthrough$)
   contextOutput = contextNet[Length (netDims) - 1].h
   lastAvgContextNetOutput = SoftMaxAverageOverSequence (attV, contextOutput)
 
   # query GRU
 
   queryEmbedded1 = TransposeTimes (Einput, Query1)
-  queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1)
+  queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1, passthrough=$usePassthrough$)
   queryOutput1 = queryNet1[Length (netDims) - 1].h
   lastAvgQueryNetOutput1 = SoftMaxAverageOverSequence (attV, queryOutput1)
 
   queryEmbedded2 = TransposeTimes (Einput, Query2)
-  queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2)
+  queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2, passthrough=$usePassthrough$)
   queryOutput2 = queryNet2[Length (netDims) - 1].h
   lastAvgQueryNetOutput2 = SoftMaxAverageOverSequence (attV, queryOutput2)
 

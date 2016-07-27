@@ -1,3 +1,16 @@
+----------------------
+ablation on maxsid=200000, maxfield=2
+
+(pm) reference: 7.0%/15.5% @ 14
+(g2) attention->uniform: ...
+(g2) passthrough->no passthrough: ...
+(g2) trigram->no trigram: ...
+(g2) trigram->no trigram, tcut=1: ...
+
+
+----------------------
+
+
 5Ia -> 3Ia++f, x2 with max
 
 3 -> short ubuntu 3, tied parameters, maxLayer=0, eDim=224 (17/26 @ 7, stuck)
