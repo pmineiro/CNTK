@@ -6,6 +6,8 @@ use strict;
 use Text::CSV;
 use Data::Dumper;
 
+srand 8675309;
+
 my $mode = shift @ARGV or die;
 my $vocabfile = shift @ARGV or die;
 my $maxsid = shift @ARGV or die;
@@ -166,14 +168,20 @@ sub printexample ($$$$)
 {
   my ($sid, $context, $query1, $query2) = @_;
 
+  my $ml = "|MultiLabel 1 0";
+
+  if (rand () < 0.5)
+    {
+      my $tmp = $query1; $query1 = $query2; $query2 = $tmp;
+      $ml = "|MultiLabel 0 1";
+    }
+
   my @fullcontext = tokenize $context;
   my @context = @fullcontext > $ntk ? splice @fullcontext, -$ntk : @fullcontext;
   my @fullquery1 = tokenize $query1;
   my @query1 = @fullquery1 > $ntk ? splice @fullquery1, $ntk : @fullquery1;
   my @fullquery2 = tokenize $query2;
   my @query2 = @fullquery2 > $ntk ? splice @fullquery2, $ntk : @fullquery2;
-
-  my $ml = "|MultiLabel 1 0";
 
   while (@context || @query1 || @query2)
     {
