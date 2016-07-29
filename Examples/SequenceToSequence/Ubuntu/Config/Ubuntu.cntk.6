@@ -1,16 +1,5 @@
 ########################################################################
-# trigram variant, with attention 
-# 
-# no zoneout, dropout=0.2: 
-# 19+...
-# Finished Epoch[ 4 of 200]: [Training] ce = 0.22072354 * 200000; errs = 9.290% * 200000; totalSamplesSeen = 800000; learningRatePerSample = 9.3243162e-07; epochTime=2267.51s
-# Finished Epoch[ 4 of 200]: [Validate] ce = 0.45519607 * 19560; errs = 16.017% * 19560
-#
-# full dataset:
-#
-# Finished Epoch[ 2 of 200]: [Training] ce = 0.24944411 * 898142; errs = 10.668%* 898142; totalSamplesSeen = 1796284; learningRatePerSample = 9.7656248e-06; epochTime=10109.7s
-# Finished Epoch[ 2 of 200]: [Validate] ce = 0.24193198 * 19560; errs = 10.184% * 19560
-#
+# speaker feature version of 3ta
 ########################################################################
 
 RunRootDir = ".."      # default if not overridden
@@ -20,7 +9,7 @@ OutDir     = "$RunRootDir$/Out"
 command = train
 
 deviceId = auto 
-ExpId = ubuntu-3
+ExpId = ubuntu-6
 
 modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
 stderr     = "$OutDir$/$ExpId$/Ubuntu"
@@ -29,6 +18,7 @@ fileext = "tri" # or "quad"
 vocabDim = 15915 # or 16468
 hiddenDim = 384
 embeddingDim = 384
+embeddingDimPlus2 = 386
 maxLayer = 1
 initLearningRate = 0.5
 dropoutRate = 0.2
@@ -40,7 +30,7 @@ maxEpochs = 200
 useAttention = true
 usePassthrough = true
 
-globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Query1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2 = [ dim = "$vocabDim$"; format = "sparse" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
+globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Speaker = [ dim = "2"; format = "sparse" ]; Query1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query1Speaker = [ dim="2"; format = "sparse" ]; Query2 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2Speaker = [ dim = "2"; format = "sparse" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
 
 #---------------------------
 # network
@@ -56,7 +46,7 @@ include "grufactory.bs"
 #---------------------------
 
   vocabDim = $vocabDim$
-  hiddenDim = $hiddenDim$
+  hiddenDim = $embeddingDimPlus2$
   embeddingDim = $embeddingDim$
   precision = "float"
   maxLayer = $maxLayer$
@@ -65,10 +55,13 @@ include "grufactory.bs"
 
   contextAxis = DynamicAxis ();
   Context = Input (vocabDim, dynamicAxis=contextAxis, tag='feature')
+  Speaker = Input (2, dynamicAxis=contextAxis, tag='feature')
   queryAxis1 = DynamicAxis ()
   Query1 = Input (vocabDim, dynamicAxis=queryAxis1, tag='feature')
+  Query1Speaker = Input (2, dynamicAxis=queryAxis1, tag='feature')
   queryAxis2 = DynamicAxis ()
   Query2 = Input (vocabDim, dynamicAxis=queryAxis2, tag='feature')
+  Query2Speaker = Input (2, dynamicAxis=queryAxis2, tag='feature')
   MultiLabel = Input (2, tag='label')
 
   # average (over dynamic axis) network
@@ -107,19 +100,22 @@ include "grufactory.bs"
          else BS.ConstantTensor (0, (hiddenDim : 1))
 
   # context GRU
-  contextEmbedded = TransposeTimes (Einput, Context)
+  contextEmbeddedPre = TransposeTimes (Einput, Context)
+  contextEmbedded = Splice ( ( contextEmbeddedPre : Speaker ), axis=1 )
   contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded, passthrough=$usePassthrough$)
   contextOutput = contextNet[Length (netDims) - 1].h
   lastAvgContextNetOutput = SoftMaxAverageOverSequence (attV, contextOutput)
 
   # query GRU
 
-  queryEmbedded1 = TransposeTimes (Einput, Query1)
+  queryEmbedded1Pre = TransposeTimes (Einput, Query1)
+  queryEmbedded1 = Splice ( ( queryEmbedded1Pre : Query1Speaker ), axis=1 )
   queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1, passthrough=$usePassthrough$)
   queryOutput1 = queryNet1[Length (netDims) - 1].h
   lastAvgQueryNetOutput1 = SoftMaxAverageOverSequence (attV, queryOutput1)
 
-  queryEmbedded2 = TransposeTimes (Einput, Query2)
+  queryEmbedded2Pre = TransposeTimes (Einput, Query2)
+  queryEmbedded2 = Splice ( ( queryEmbedded2Pre : Query2Speaker ), axis=1 )
   queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2, passthrough=$usePassthrough$)
   queryOutput2 = queryNet2[Length (netDims) - 1].h
   lastAvgQueryNetOutput2 = SoftMaxAverageOverSequence (attV, queryOutput2)
@@ -148,7 +144,7 @@ train = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3$fileext$.megatrain"
+    file = "$DataDir$/shortubuntu6$fileext$.megatrain"
     randomize = "true"
 
     input = $globalInput$
@@ -156,7 +152,7 @@ train = [
 
   cvReader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3$fileext$.valid"
+    file = "$DataDir$/shortubuntu6$fileext$.valid"
     randomize = "false"
 
     input = $globalInput$
@@ -192,7 +188,7 @@ test = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3$fileext$.test"
+    file = "$DataDir$/shortubuntu6$fileext$.test"
     randomize = "false"
 
     input = $globalInput$

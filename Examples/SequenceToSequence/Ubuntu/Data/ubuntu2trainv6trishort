@@ -178,6 +178,24 @@ sub printexample ($$$$)
 
   my @fullcontext = tokenize $context;
   my @context = @fullcontext > $ntk ? splice @fullcontext, -$ntk : @fullcontext;
+
+  my @speaking;
+  my $curspeaker = 2;
+
+  foreach my $pos (0 .. $#context)
+    {
+      my $tok = $context[$#context - $pos];
+      if ($tok eq 'eot')
+        {
+          $curspeaker = 3 - $curspeaker;
+        }
+      push @speaking, $curspeaker;
+    }
+  @speaking = reverse @speaking;
+
+  die "wtf $speaking[-1]" unless $speaking[-1] == 1;
+  die "wtf $#speaking $#context" unless $#context == $#speaking;
+
   my @fullquery1 = tokenize $query1;
   my @query1 = @fullquery1 > $ntk ? splice @fullquery1, $ntk : @fullquery1;
   my @fullquery2 = tokenize $query2;
@@ -185,9 +203,9 @@ sub printexample ($$$$)
 
   while (@context || @query1 || @query2)
     {
-      my $ct1 = @context ? "|Context @{[features (shift @context, \%trimemo, \%vocab)]}" : "";
-      my $qt1 = @query1 ?  "|Query1 @{[features (shift @query1, \%trimemo, \%vocab)]}" : "";
-      my $qt2 = @query2 ?  "|Query2 @{[features (shift @query2, \%trimemo, \%vocab)]}" : "";
+      my $ct1 = @context ? "|Speaker @{[shift @speaking]}:1 |Context @{[features (shift @context, \%trimemo, \%vocab)]}" : "";
+      my $qt1 = @query1 ?  "|Query1Speaker 2:1 |Query1 @{[features (shift @query1, \%trimemo, \%vocab)]}" : "";
+      my $qt2 = @query2 ?  "|Query2Speaker 2:1 |Query2 @{[features (shift @query2, \%trimemo, \%vocab)]}" : "";
 
       print "$sid $ct1 $qt1 $qt2 $ml\n";
 
