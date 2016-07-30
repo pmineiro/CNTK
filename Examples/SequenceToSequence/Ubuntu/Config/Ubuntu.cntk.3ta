@@ -25,8 +25,8 @@ ExpId = ubuntu-3
 modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
 stderr     = "$OutDir$/$ExpId$/Ubuntu"
 
-fileext = "tri" # or "quad"
-vocabDim = 15915 # or 16468
+fileext = "tri" 
+vocabDim = 15915
 hiddenDim = 384
 embeddingDim = 384
 maxLayer = 1
