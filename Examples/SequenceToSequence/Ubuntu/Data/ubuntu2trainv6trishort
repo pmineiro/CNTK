@@ -142,21 +142,24 @@ sub features ($$$)
 {
   my ($v, $trimemo, $codec) = @_;
 
-  $trimemo->{$v} ||= process ($v, $codec);
+  return process ($v, $codec);
 
-#  warn $trimemo->{$v};
-
-  return $trimemo->{$v};
+# NB: memoization screws up the "exdedup tcut logic"
+#
+#  $trimemo->{$v} ||= process ($v, $codec);
+#  return $trimemo->{$v};
 }
 
 sub tokenize ($)
 {
   my ($s) = @_;
 
-  return map { s/[0-9]+/0/g; 
-               $_ }
-             split /[\s[:punct:]]+/,
-             $s;
+  return grep { /\S/ }
+         map { s/[0-9]+/0/g; 
+                my @v = split /([[:punct:]]+)/, $_;
+                @v }
+              split /\s+/,
+              $s;
 }
 
 #----------------------------------------------------------------
