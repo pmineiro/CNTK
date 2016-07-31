@@ -188,7 +188,8 @@ sub printexample ($$$$)
   foreach my $pos (0 .. $#context)
     {
       my $tok = $context[$#context - $pos];
-      if ($tok eq 'eot')
+      if ($tok eq '__' && $pos < $#context 
+          && $context[$#context - $pos - 1] eq 'eot')
         {
           $curspeaker = 3 - $curspeaker;
         }
@@ -234,9 +235,9 @@ LINE: while (my $row = $csv->getline (*ARGV))
     my @fields = @$row;
 
     %exdedup = ();
-#    my $maxfield = ($mode eq "preprocess" || $mode eq "megatrain") ? $#fields
-#                                                                   : 2;
-    my $maxfield = 2;
+    my $maxfield = ($mode eq "preprocess" || $mode eq "megatrain") ? 3
+                                                                   : 2;
+
     foreach my $col (2 .. $maxfield)
       {
         printexample ($sid, $fields[0], $fields[1], $fields[$col]);
