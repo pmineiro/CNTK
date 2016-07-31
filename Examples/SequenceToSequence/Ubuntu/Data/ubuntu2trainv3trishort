@@ -216,9 +216,9 @@ LINE: while (my $row = $csv->getline (*ARGV))
     my @fields = @$row;
 
     %exdedup = ();
-#    my $maxfield = ($mode eq "preprocess" || $mode eq "megatrain") ? $#fields
-#                                                                   : 2;
-    my $maxfield = 2;
+    my $maxfield = ($mode eq "preprocess" || $mode eq "megatrain") ? 3
+                                                                   : 2;
+
     foreach my $col (2 .. $maxfield)
       {
         printexample ($sid, $fields[0], $fields[1], $fields[$col]);
