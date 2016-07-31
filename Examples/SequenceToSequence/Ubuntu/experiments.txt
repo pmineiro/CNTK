@@ -18,8 +18,14 @@ tcut=19, passthrough: 5.9/14.4 @ 13 ...+
 tcut=79, passthrough: 6.0/14.5 @ 15 ...+
 tcut=79, no passthrough: 10.9/15.3 @ 7 ...
 
+redo sane splice:
+
+--------------------
+insane splice posse
+
 (gcr) tcut=19, no passthrough, full dataset x2: ...
-(g2) speaker features, tcut=19, no passthrough, full dataset x2: ...
+(g2) speaker features, tcut=19, no passthrough, full dataset x2: (killed)
+-------------------
 
 ----------------------
 
