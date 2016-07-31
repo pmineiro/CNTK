@@ -4,7 +4,7 @@ ntk:=80
 maxsid:=10000000
 tcut:=19
 
-all: shortubuntu3tri.megatrain shortubuntu3tri.valid shortubuntu3tri.test
+all: shortubuntu3tri.megatrain shortubuntu3tri.valid shortubuntu3tri.test shortubuntu6tri.megatrain shortubuntu6tri.valid shortubuntu6tri.test
 
 shortvocab6tri: megatrain.csv ubuntu2trainv6trishort
 	perl ./$(word 2,$^) preprocess $@ $(maxsid) 2 $(ntk) $(tcut) $< > /dev/null
