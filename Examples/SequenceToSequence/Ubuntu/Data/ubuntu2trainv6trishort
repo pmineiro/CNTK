@@ -142,12 +142,16 @@ sub features ($$$)
 {
   my ($v, $trimemo, $codec) = @_;
 
-  return process ($v, $codec);
-
-# NB: memoization screws up the "exdedup tcut logic"
-#
-#  $trimemo->{$v} ||= process ($v, $codec);
-#  return $trimemo->{$v};
+  if ($mode eq "preprocess")
+    {
+      # NB: memoization screws up the "exdedup tcut logic"
+      return process ($v, $codec);
+    }
+  else
+    {
+      $trimemo->{$v} ||= process ($v, $codec);
+      return $trimemo->{$v};
+    }
 }
 
 sub tokenize ($)
@@ -201,9 +205,9 @@ sub printexample ($$$$)
   die "wtf $#speaking $#context" unless $#context == $#speaking;
 
   my @fullquery1 = tokenize $query1;
-  my @query1 = @fullquery1 > $ntk ? splice @fullquery1, $ntk : @fullquery1;
+  my @query1 = @fullquery1 > $ntk ? splice @fullquery1, 0, $ntk : @fullquery1;
   my @fullquery2 = tokenize $query2;
-  my @query2 = @fullquery2 > $ntk ? splice @fullquery2, $ntk : @fullquery2;
+  my @query2 = @fullquery2 > $ntk ? splice @fullquery2, 0, $ntk : @fullquery2;
 
   while (@context || @query1 || @query2)
     {
