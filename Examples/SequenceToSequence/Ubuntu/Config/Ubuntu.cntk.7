@@ -1,0 +1,241 @@
+########################################################################
+# speaker feature version of 3ta
+########################################################################
+
+RunRootDir = ".."      # default if not overridden
+DataDir    = "$RunRootDir$/Data"
+OutDir     = "$RunRootDir$/Out"
+
+command = train
+
+deviceId = auto 
+ExpId = ubuntu-6
+
+modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
+stderr     = "$OutDir$/$ExpId$/Ubuntu"
+
+fileext = "tri" 
+vocabDim = 15915
+hiddenDim = 384
+embeddingDim = 384
+maxLayer = 1
+poolhiddenDim = 32
+poolembeddingDim = 32
+poolLayer = 1
+initLearningRate = 0.5
+dropoutRate = 0.2
+minibatchSize = 1024:2048
+momentum = 0.5:0.9
+restartFrom = "/dev/null"
+addZoneout = false
+maxEpochs = 200
+useAttention = true
+usePassthrough = false
+
+globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Speaker = [ dim = "2"; format = "sparse" ]; LuC = [ dim = "$vocabDim$"; format = "sparse" ]; Query1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query1Speaker = [ dim="2"; format = "sparse" ]; FuQ1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2Speaker = [ dim = "2"; format = "sparse" ]; FuQ2 = [ dim = "$vocabDim$"; format = "sparse" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
+
+#---------------------------
+# network
+#---------------------------
+
+BrainScriptNetworkBuilder = (if "$restartFrom$" == "/dev/null"
+then (new ComputationNetwork [
+
+include "grufactory.bs"
+
+#---------------------------
+# definition
+#---------------------------
+
+  vocabDim = $vocabDim$
+  hiddenDim = $embeddingDim$ + 2 
+  embeddingDim = $embeddingDim$
+  precision = "float"
+  maxLayer = $maxLayer$
+  poolhiddenDim = $poolhiddenDim$
+  poolembeddingDim = $poolembeddingDim$
+  poolLayer = $poolLayer$
+  combohiddenDim = hiddenDim + $poolhiddenDim$
+  
+  netDims[i:0..maxLayer] = hiddenDim
+  poolDims[i:0..poolLayer] = poolhiddenDim
+
+  contextAxis = DynamicAxis ();
+  Context = Input (vocabDim, dynamicAxis=contextAxis, tag='feature')
+  Speaker = Input (2, dynamicAxis=contextAxis, tag='feature')
+  lucAxis = DynamicAxis ();
+  LuC = Input (vocabDim, dynamicAxis=lucAxis, tag='feature')
+  queryAxis1 = DynamicAxis ()
+  Query1 = Input (vocabDim, dynamicAxis=queryAxis1, tag='feature')
+  Query1Speaker = Input (2, dynamicAxis=queryAxis1, tag='feature')
+  fuq1Axis = DynamicAxis ();
+  FuQ1 = Input (vocabDim, dynamicAxis=fuq1Axis, tag='feature');
+  queryAxis2 = DynamicAxis ()
+  Query2 = Input (vocabDim, dynamicAxis=queryAxis2, tag='feature')
+  Query2Speaker = Input (2, dynamicAxis=queryAxis2, tag='feature')
+  fuq2Axis = DynamicAxis ();
+  FuQ2 = Input (vocabDim, dynamicAxis=fuq2Axis, tag='feature');
+  MultiLabel = Input (2, tag='label')
+
+  # average pooling (over dynamic axis) network
+
+  AverageOverSequence (in) = [
+    mysum = in + PastValue (0, mysum, defaultHiddenActivation=0)
+    mycount = BS.Constants.OnesLike (in) + PastValue (0, mycount, defaultHiddenActivation=0)
+    myavg = ElementDivide (mysum, mycount)
+    out = BS.Sequences.Last (myavg)
+  ].out
+
+  # max pooling (over dynamic axis) network
+
+  MaxOverSequence (in) = [
+    mymax = in + RectifiedLinear (PastValue (0, mymax, defaultHiddenActivation=0) - in)
+    out = BS.Sequences.Last (mymax)
+  ].out
+
+  # softmax (over dynamic axis) network
+  SoftMaxOverSequence (z) = [
+    runningLogSum = BS.LogPlus (z, PastValue (0, runningLogSum, defaultHiddenActivation=-1e30))
+    logSum = BS.Boolean.If (BS.Loop.IsLast (runningLogSum),    # if last entry
+                   /*then*/ runningLogSum,                     # then copy that
+                   /*else*/ FutureValue (0, logSum))           # else just propagate to the front
+    result = Exp (z - logSum)
+  ].result
+
+  # softmax weighted average (over dynamic axis) network
+
+  SoftMaxAverageOverSequence (attW, z) = [
+    attPre = FlattenDimensions (TransposeTimes (attW, z), 1, 2)
+    att = SoftMaxOverSequence (attPre)
+    attZ = ElementTimes (att, z)
+    mysum = attZ + PastValue (0, mysum, defaultHiddenActivation=0)
+    out = BS.Sequences.Last (mysum)
+  ].out
+
+  # tied parameters
+  Einput = BS.Parameter (vocabDim, embeddingDim, init='gaussian')
+  Factory = RecurrentBiresidualGRUStackFactory (netDims, hiddenDim, addDropout=true, addZoneout=$addZoneout$)
+  attV = if $useAttention$ 
+         then Parameter (hiddenDim, 1, init='fixedValue', value=0.0)
+         else BS.ConstantTensor (0, (hiddenDim : 1))
+  poolEinput = BS.Parameter (vocabDim, poolembeddingDim, init='gaussian')
+  poolFactory = RecurrentBiresidualGRUStackFactory (poolDims, poolhiddenDim, addDropout=true, addZoneout=$addZoneout$)
+
+  # context GRU
+  contextEmbeddedPre = TransposeTimes (Einput, Context)
+  contextEmbedded = Splice ( ( contextEmbeddedPre : Speaker ), axis=1 )
+  contextNet = RecurrentBiresidualGRUStackInstantiate (Factory, contextEmbedded, passthrough=$usePassthrough$)
+  contextOutput = contextNet[Length (netDims) - 1].h
+  prelastAvgContextNetOutput = SoftMaxAverageOverSequence (attV, contextOutput)
+
+  # LuC GRU
+  lucEmbedded = TransposeTimes (poolEinput, LuC)
+  lucNet = RecurrentBiresidualGRUStackInstantiate (poolFactory, lucEmbedded, passthrough=$usePassthrough$)
+  lucNetOutput = lucNet[Length(poolDims) - 1].h
+  poolLucNetOutput = ReconcileDynamicAxis (MaxOverSequence (lucNetOutput), prelastAvgContextNetOutput)
+
+  lastAvgContextNetOutput = Splice ( ( prelastAvgContextNetOutput : poolLucNetOutput ), axis=1 )
+
+  # query GRU
+
+  queryEmbedded1Pre = TransposeTimes (Einput, Query1)
+  queryEmbedded1 = Splice ( ( queryEmbedded1Pre : Query1Speaker ), axis=1 )
+  queryNet1 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded1, passthrough=$usePassthrough$)
+  queryOutput1 = queryNet1[Length (netDims) - 1].h
+  prelastAvgQueryNetOutput1 = SoftMaxAverageOverSequence (attV, queryOutput1)
+
+  queryEmbedded2Pre = TransposeTimes (Einput, Query2)
+  queryEmbedded2 = Splice ( ( queryEmbedded2Pre : Query2Speaker ), axis=1 )
+  queryNet2 = RecurrentBiresidualGRUStackInstantiate (Factory, queryEmbedded2, passthrough=$usePassthrough$)
+  queryOutput2 = queryNet2[Length (netDims) - 1].h
+  prelastAvgQueryNetOutput2 = SoftMaxAverageOverSequence (attV, queryOutput2)
+
+  # FuQ GRU
+  fuq1Embedded = TransposeTimes (poolEinput, FuQ1)
+  fuq1Net = RecurrentBiresidualGRUStackInstantiate (poolFactory, fuq1Embedded, passthrough=$usePassthrough$)
+  fuq1NetOutput = fuq1Net[Length(poolDims) - 1].h
+  poolFuq1NetOutput = ReconcileDynamicAxis (MaxOverSequence (fuq1NetOutput), prelastAvgQueryNetOutput1)
+
+  lastAvgQueryNetOutput1 = Splice ( ( prelastAvgQueryNetOutput1 : poolFuq1NetOutput ), axis=1 )
+
+  fuq2Embedded = TransposeTimes (poolEinput, FuQ2)
+  fuq2Net = RecurrentBiresidualGRUStackInstantiate (poolFactory, fuq2Embedded, passthrough=$usePassthrough$)
+  fuq2NetOutput = fuq2Net[Length(poolDims) - 1].h
+  poolFuq2NetOutput = ReconcileDynamicAxis (MaxOverSequence (fuq2NetOutput), prelastAvgQueryNetOutput2)
+
+  lastAvgQueryNetOutput2 = Splice ( ( prelastAvgQueryNetOutput2 : poolFuq2NetOutput ), axis=1 )
+
+  # inner product similarity
+
+  M = BS.Parameter (combohiddenDim, combohiddenDim, init='identity')
+  similarityQuad1 = TransposeTimes (ReconcileDynamicAxis (lastAvgContextNetOutput, lastAvgQueryNetOutput1), TransposeTimes (M, lastAvgQueryNetOutput1))
+  similarityQuad2 = TransposeTimes (ReconcileDynamicAxis (lastAvgContextNetOutput, lastAvgQueryNetOutput2), TransposeTimes (M, lastAvgQueryNetOutput2))
+
+  # loss function
+  
+  comboScore = FlattenDimensions (Splice ( ( similarityQuad1 : ReconcileDynamicAxis (similarityQuad2, similarityQuad1 ) ), axis=1 ), 1, 2)
+  recCombo = ReconcileDynamicAxis (comboScore, MultiLabel)
+  ce = CrossEntropyWithSoftmax (MultiLabel, recCombo, tag='criterion')
+  errs = ErrorPrediction (MultiLabel, recCombo, tag='evaluation')
+])
+else
+(BS.Network.Load ("$restartFrom$"))
+)
+
+train = [
+  action = "train"
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/shortubuntu7$fileext$.megatrain"
+    randomize = "true"
+
+    input = $globalInput$
+  ]
+
+  cvReader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/shortubuntu7$fileext$.valid"
+    randomize = "false"
+
+    input = $globalInput$
+  ]
+
+  SGD = [ 
+    modelPath = "$modelPath$"
+    epochSize = 0
+    keepCheckPointFiles = "false"
+    maxEpochs = $maxEpochs$
+    minibatchSize = $minibatchSize$
+    learningRatesPerMB = $initLearningRate$
+    momentumPerMB = $momentum$
+    dropoutRate = $dropoutRate$
+    gradUpdateType = "RMSProp"
+
+    # settings for Auto Adjust Learning Rate
+    AutoAdjust = [
+        autoAdjustLR = "adjustAfterEpoch"
+        loadBestModel = "true"
+        useEvalCriterionControlLR = "true"
+    ]
+  ]
+]
+
+# TODO: this can only test accuracy with 1 distractor
+test = [
+  action = "eval"
+
+  minibatchSize = $minibatchSize$
+  traceLevel = 1
+  epochSize = 0
+
+  reader = [
+    readerType = "CNTKTextFormatReader"
+    file = "$DataDir$/shortubuntu7$fileext$.test"
+    randomize = "false"
+
+    input = $globalInput$
+  ]
+]
