@@ -14,8 +14,8 @@ ExpId = ubuntu-6
 modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
 stderr     = "$OutDir$/$ExpId$/Ubuntu"
 
-fileext = "tri" # or "quad"
-vocabDim = 15915 # or 16468
+fileext = "tri" 
+vocabDim = 15915
 hiddenDim = 384
 embeddingDim = 384
 embeddingDimPlus2 = 386
@@ -28,7 +28,7 @@ restartFrom = "/dev/null"
 addZoneout = false
 maxEpochs = 200
 useAttention = true
-usePassthrough = true
+usePassthrough = false
 
 globalInput = [ Context = [ dim = "$vocabDim$"; format = "sparse" ]; Speaker = [ dim = "2"; format = "sparse" ]; Query1 = [ dim = "$vocabDim$"; format = "sparse" ]; Query1Speaker = [ dim="2"; format = "sparse" ]; Query2 = [ dim = "$vocabDim$"; format = "sparse" ]; Query2Speaker = [ dim = "2"; format = "sparse" ]; MultiLabel = [ dim = 2; format = "dense" ] ]
 
