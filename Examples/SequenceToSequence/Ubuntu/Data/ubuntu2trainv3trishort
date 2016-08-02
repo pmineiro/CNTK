@@ -186,9 +186,9 @@ sub printexample ($$$$)
   my @fullcontext = tokenize $context;
   my @context = @fullcontext > $ntk ? splice @fullcontext, -$ntk : @fullcontext;
   my @fullquery1 = tokenize $query1;
-  my @query1 = @fullquery1 > $ntk ? splice @fullquery1, 0, $ntk : @fullquery1;
+  my @query1 = @fullquery1 > $ntk ? splice @fullquery1, -$ntk : @fullquery1;
   my @fullquery2 = tokenize $query2;
-  my @query2 = @fullquery2 > $ntk ? splice @fullquery2, 0, $ntk : @fullquery2;
+  my @query2 = @fullquery2 > $ntk ? splice @fullquery2, -$ntk : @fullquery2;
 
   while (@context || @query1 || @query2)
     {
