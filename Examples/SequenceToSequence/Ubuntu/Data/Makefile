@@ -6,6 +6,12 @@ tcut:=19
 
 all: shortubuntu3tri.megatrain shortubuntu3tri.valid shortubuntu3tri.test shortubuntu6tri.megatrain shortubuntu6tri.valid shortubuntu6tri.test
 
+shortvocab7tri: megatrain.csv ubuntu2trainv7trishort
+	perl ./$(word 2,$^) preprocess $@ $(maxsid) 2 $(ntk) $(tcut) $< > /dev/null
+
+shortubuntu7tri.%: %.csv ubuntu2trainv7trishort shortvocab7tri
+	perl ./$(word 2,$^) $* $(word 3,$^) $(maxsid) 2 $(ntk) $(tcut) $< > $@
+
 shortvocab6tri: megatrain.csv ubuntu2trainv6trishort
 	perl ./$(word 2,$^) preprocess $@ $(maxsid) 2 $(ntk) $(tcut) $< > /dev/null
 
