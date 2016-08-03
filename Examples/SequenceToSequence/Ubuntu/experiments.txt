@@ -18,14 +18,17 @@ tcut=19, passthrough: 5.9/14.4 @ 13 ...+
 tcut=79, passthrough: 6.0/14.5 @ 15 ...+
 tcut=79, no passthrough: 10.9/15.3 @ 7 ...
 
-redo sane splice:
+----------------------
+redo sane splice, tcut=19, no passthrough
 
---------------------
-insane splice posse
-
-(gcr) tcut=19, no passthrough, full dataset x2: ...
-(g2) speaker features, tcut=19, no passthrough, full dataset x2: (killed)
--------------------
+baseline: 6.9/15.2 2 12
+(pm) last query tokens: 5.5/14.9 @ 13 
++speaker: 7.8/14.5 @ 15 ...+
+(chonto) +speaker, max-utterance: 6.9/14.3 @ 14 ...+
+(g2) +speaker, max-utterance (query-last): 8.3/14.3 @ 12 ...+
+(gcr) baseline full dataset x2: ...
+   (first query tokens: 25.6/17.9, 18.0/16.4)
+(chonto) +speaker full dataset x2: ...
 
 ----------------------
 

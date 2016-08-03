@@ -171,30 +171,6 @@ sub tokenize ($)
 my %trimemo;
 my %vocab;
 
-sub first_utterance (@)
-{
-  my (@t) = @_;
-
-  do { warn Dumper (\@t); die "wtf" } unless $#t > 1;
-  my @rv;
-
-  push @rv, $t[0], $t[1];
-
-  POS: foreach my $pos (2 .. $#t)
-    {
-      push @rv, $t[$pos];
-
-      if ($t[$pos-2] eq '__' &&
-          $t[$pos-1] eq 'eou' && 
-          $t[$pos] eq '__')
-        {
-          last POS;
-        }
-    }
-
-  return @rv;
-}
-
 sub last_utterance (@)
 {
   my (@t) = @_;
@@ -203,15 +179,16 @@ sub last_utterance (@)
 
   # assume ends with __eou__ __eot__ 
   
-  die "wtf" unless $revt[0] eq '__' && $revt[1] eq 'eot' && $revt[2] eq '__' 
+  do { warn Dumper (\@revt); die "wtf" }
+            unless $revt[0] eq '__' && $revt[1] eq 'eot' && $revt[2] eq '__' 
                 && $revt[3] eq '__' && $revt[4] eq 'eou' && $revt[5] eq '__';
 
   my @rv;
-  push @rv, $revt[6], $revt[7];
 
-  POS: foreach my $pos (8 .. $#revt-2)
+  POS: foreach my $pos (6 .. $#revt)
     {
-      if ($revt[$pos] eq '__' &&
+      if ($pos+2 <= $#revt && 
+          $revt[$pos] eq '__' &&
           ($revt[$pos+1] eq 'eou' || $revt[$pos+1] eq 'eot') && 
           $revt[$pos+2] eq '__')
         {
@@ -220,8 +197,6 @@ sub last_utterance (@)
 
       push @rv, $revt[$pos];
     }
-
-  unshift @rv, '__', 'eou', '__';  # match return value of first_utterance
 
   return reverse @rv;
 }
@@ -261,13 +236,13 @@ sub printexample ($$$$)
   die "wtf $#speaking $#context" unless $#context == $#speaking;
 
   my @fullquery1 = tokenize $query1;
-  my @query1 = @fullquery1 > $ntk ? splice @fullquery1, 0, $ntk : @fullquery1;
+  my @query1 = @fullquery1 > $ntk ? splice @fullquery1, -$ntk : @fullquery1;
   my @fullquery2 = tokenize $query2;
-  my @query2 = @fullquery2 > $ntk ? splice @fullquery2, 0, $ntk : @fullquery2;
+  my @query2 = @fullquery2 > $ntk ? splice @fullquery2, -$ntk : @fullquery2;
 
   my @lastutterancecontext = last_utterance @context;
-  my @firstutterancequery1 = first_utterance @query1;
-  my @firstutterancequery2 = first_utterance @query2;
+  my @firstutterancequery1 = last_utterance @query1, '__', 'eot', '__';
+  my @firstutterancequery2 = last_utterance @query2, '__', 'eot', '__';
 
   while (@context || @query1 || @query2)
     {
