@@ -198,6 +198,8 @@ sub last_utterance (@)
       push @rv, $revt[$pos];
     }
 
+  unshift @rv, '__', 'eou', '__';
+
   return reverse @rv;
 }
 
