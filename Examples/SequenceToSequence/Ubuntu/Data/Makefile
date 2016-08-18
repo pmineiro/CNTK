@@ -2,7 +2,7 @@
 
 ntk:=80
 maxsid:=10000000
-tcut:=19
+tcut:=6
 
 all: shortubuntu3tri.megatrain shortubuntu3tri.valid shortubuntu3tri.test shortubuntu6tri.megatrain shortubuntu6tri.valid shortubuntu6tri.test
 

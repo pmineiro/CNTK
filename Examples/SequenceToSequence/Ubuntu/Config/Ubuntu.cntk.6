@@ -18,7 +18,6 @@ fileext = "tri"
 vocabDim = 15915
 hiddenDim = 384
 embeddingDim = 384
-embeddingDimPlus2 = 386
 maxLayer = 1
 initLearningRate = 0.5
 dropoutRate = 0.2
@@ -46,7 +45,7 @@ include "grufactory.bs"
 #---------------------------
 
   vocabDim = $vocabDim$
-  hiddenDim = $embeddingDimPlus2$
+  hiddenDim = $embeddingDim$ + 2
   embeddingDim = $embeddingDim$
   precision = "float"
   maxLayer = $maxLayer$

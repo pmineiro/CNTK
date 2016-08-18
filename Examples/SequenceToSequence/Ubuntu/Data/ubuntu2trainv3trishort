@@ -50,7 +50,7 @@ sub load_hash ($$)
     }
 }
 
-my %exdedup;
+my %excount;
 
 sub encodeany ($$$)
 {
@@ -59,10 +59,30 @@ sub encodeany ($$$)
   if ($mode eq "preprocess")
     {
       $dict->{$v} ||= [ scalar keys %$dict, 0 ];
-      do { ++$dict->{$v}->[1]; $exdedup{$v} = 1; } unless exists $exdedup{$v};
+      ++$excount{$v};
     }
 
   return exists $dict->{$v} ? $dict->{$v}->[0] : $off + scalar keys %$dict;
+}
+
+sub clearexcount ($)
+{
+  my ($dict) = @_;
+
+  if ($mode eq "preprocess")
+    {
+      while (my ($k, $v) = each %excount)
+        {
+          die "wtf '$k'" unless exists $dict->{$k};
+    
+          if ($dict->{$k}->[1] < $v)
+            {
+              $dict->{$k}->[1] = $v;
+            }
+        }
+    }
+
+  %excount = ();
 }
 
 sub encodetri ($$)
@@ -144,7 +164,7 @@ sub features ($$$)
 
   if ($mode eq "preprocess")
     {
-      # NB: memoization screws up the "exdedup tcut logic"
+      # NB: memoization screws up the excount logic
       return process ($v, $codec);
     }
   else
@@ -219,7 +239,8 @@ LINE: while (my $row = $csv->getline (*ARGV))
   {
     my @fields = @$row;
 
-    %exdedup = ();
+    clearexcount (\%vocab);
+
     my $maxfield = ($mode eq "preprocess" || $mode eq "megatrain") ? 3
                                                                    : 2;
 
@@ -229,5 +250,7 @@ LINE: while (my $row = $csv->getline (*ARGV))
         last LINE if ++$sid > $maxsid;
       }
   }
+
+clearexcount (\%vocab);
 
 save_hash ($vocabfile, \%vocab);
