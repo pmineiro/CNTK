@@ -1,32 +1,16 @@
-########################################################################
-# trigram variant, with attention 
-# 
-# no zoneout, dropout=0.2: 
-# 19+...
-# Finished Epoch[ 4 of 200]: [Training] ce = 0.22072354 * 200000; errs = 9.290% * 200000; totalSamplesSeen = 800000; learningRatePerSample = 9.3243162e-07; epochTime=2267.51s
-# Finished Epoch[ 4 of 200]: [Validate] ce = 0.45519607 * 19560; errs = 16.017% * 19560
-#
-# full dataset:
-#
-# Finished Epoch[ 2 of 200]: [Training] ce = 0.24944411 * 898142; errs = 10.668%* 898142; totalSamplesSeen = 1796284; learningRatePerSample = 9.7656248e-06; epochTime=10109.7s
-# Finished Epoch[ 2 of 200]: [Validate] ce = 0.24193198 * 19560; errs = 10.184% * 19560
-#
-########################################################################
-
 RunRootDir = ".."      # default if not overridden
 DataDir    = "$RunRootDir$/Data"
 OutDir     = "$RunRootDir$/Out"
-epochSize = 0
 
 command = train
 
 deviceId = auto 
-ExpId = ubuntu-3
+ExpId = utt-3
 
-modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
-stderr     = "$OutDir$/$ExpId$/Ubuntu"
+modelPath  = "$OutDir$/$ExpId$/Utt.dnn"
+stderr     = "$OutDir$/$ExpId$/Utt"
 
-fileext = "tri" 
+fileext = "utt" 
 vocabDim = 15915
 hiddenDim = 384
 embeddingDim = 384
@@ -35,7 +19,6 @@ initLearningRate = 0.5
 dropoutRate = 0.2
 minibatchSize = 1024:2048
 momentum = 0.5:0.9
-epochSize = 0
 restartFrom = "/dev/null"
 addZoneout = false
 maxEpochs = 200
@@ -157,7 +140,7 @@ train = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3$fileext$.megatrain"
+    file = "$DataDir$/$fileext$.train"
     randomize = "true"
 
     input = $globalInput$
@@ -165,7 +148,7 @@ train = [
 
   cvReader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3$fileext$.valid"
+    file = "$DataDir$/$fileext$.valid"
     randomize = "false"
 
     input = $globalInput$
@@ -173,7 +156,7 @@ train = [
 
   SGD = [ 
     modelPath = "$modelPath$"
-    epochSize = $epochSize$
+    epochSize = 0
     keepCheckPointFiles = "false"
     maxEpochs = $maxEpochs$
     minibatchSize = $minibatchSize$
@@ -201,7 +184,7 @@ test = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3$fileext$.test"
+    file = "$DataDir$/$fileext$.test"
     randomize = "false"
 
     input = $globalInput$
