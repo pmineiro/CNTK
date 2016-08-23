@@ -23,12 +23,35 @@ redo sane splice, tcut=19, no passthrough
 
 baseline: 6.9/15.2 2 12
 (pm) last query tokens: 5.5/14.9 @ 13 
-+speaker: 7.8/14.5 @ 15 ...+
-(chonto) +speaker, max-utterance: 6.9/14.3 @ 14 ...+
-(g2) +speaker, max-utterance (query-last): 8.3/14.3 @ 12 ...+
-(gcr) baseline full dataset x2: ...
-   (first query tokens: 25.6/17.9, 18.0/16.4)
-(chonto) +speaker full dataset x2: ...
++speaker: 7.7/14.5 @ 16
+(chonto) +speaker, max-utterance: 6.6/14.2 @ 15 ...+ (killed)
+(g2) +speaker, max-utterance (query-last): 7.6/14.3 @ 14 ...+ (killed)
+(pm) +speaker, last query tokens, max-utterance (query-last): 8.2/14.7 @ 13 ...
+
+last query tokens, full dataset x2:
+(g2) baseline: 10.1/10.2 @ 14 ... (stopped)
+(g2) baseline, v49/alltri: 12.3/11.5 @ 7 ... (stopped)
+(g2) baseline, v49: 11.5/11.2 @ 7 ... (stopped)
+(g2) baseline, v79: 10.3/10.3 @ 14 ... (stopped)
+(g2) baseline, v139: 26.6/23.9 @ 1 (killed)
+(g2) baseline, +speaker: 13.9/13.2 @ 9 (died)
+(chonto) baseline, v79, +speaker: 11.7/11.5 @ 9 ... (killed)
+(g2) baseline, +speaker max-utterance: 11.1/11.1 @ 14 ... (stopped)
+(gcr) baseline, v79, +speaker max-utterance: 11.6/11.5 @ 7 ... (stopped)
+
+eSize=20M:
+(pm) baseline, bursty tcut=4: 13.4/11.9 @ 15 (4.4M) (stopped)
+(pm) baseline, bursty tcut=8: 10.7/10.0 @ 26 (7.7M) 
+(pm) baseline, bursty tcut=8, passthrough, eSize=40M: 16.0/13.9 @ 6 (3.5M) ...
+(chonto) baseline, bursty tcut=6: 10.6/9.6 @ 22 (6.5M) (stopped @ 7e-9)
+(chonto) baseline, bursty tcut=6, passthrough: 11.1/10.1 @ 16 (4.7M) ...
+(g2) baseline, bursty tcut=6, passthrough, first query tokens: 10.4/9.6 @ 21 (6.3M) ...
+(g2) baseline, bursty tcut=6, eSize=40M: 10.8/10.3 @ 20 (12M) (stopped)
+(g2) baseline, bursty tcut=6, passthrough, eSize=40M: 9.7/8.9 @ 19 (11M) ...
+(g2) baseline, bursty tcut=6, passthrough, eSize=0, clip=1e-3: ...
+(g2) baseline, bursty tcut=6, first query tokens, eSize=40M: 11.5/10.5 @ 16 (9.5M) ...
+(gcr) baseline, bursty tcut=6, +speaker: 11.5/10.6 @ 23 (6.8M) (stopped)
+(gcr) baseline, bursty tcut=6, passthrough, +speaker, eSize=40M: 13.5/12.2 @ 7 (4.1M) ...
 
 ----------------------
 

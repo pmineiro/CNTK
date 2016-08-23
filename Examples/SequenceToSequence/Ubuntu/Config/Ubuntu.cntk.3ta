@@ -35,6 +35,7 @@ initLearningRate = 0.5
 dropoutRate = 0.2
 minibatchSize = 1024:2048
 momentum = 0.5:0.9
+clipping = 1000000 # essentially infinity
 epochSize = 0
 restartFrom = "/dev/null"
 addZoneout = false
@@ -180,6 +181,7 @@ train = [
     learningRatesPerMB = $initLearningRate$
     momentumPerMB = $momentum$
     dropoutRate = $dropoutRate$
+    clippingThresholdPerSample = $clipping$
     gradUpdateType = "RMSProp"
 
     # settings for Auto Adjust Learning Rate
