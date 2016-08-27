@@ -1,0 +1,386 @@
+#! /usr/bin/env perl
+
+use warnings;
+use strict;
+
+use Data::Dumper;
+
+srand 8675309;
+
+my $mode = shift @ARGV or die;
+my $vocabfile = shift @ARGV or die;
+my $maxsid = shift @ARGV or die;
+my $numchars = shift @ARGV or die; # trigrams = 2, quadgrams = 3, etc.
+my $ntk = shift @ARGV or die; 
+my $tokencutoff = shift @ARGV or die;
+
+sub save_hash ($$)
+{
+  if ($mode eq "preprocess")
+    {
+      my ($filename, $hash) = @_;
+      my $fh = new IO::File $filename, "w" or die "$filename: $!";
+      $fh->binmode (":utf8");
+
+      my $index = 1;
+    
+      while (my ($k, $v) = each %$hash)
+        {
+          my (undef, $c) = @$v;
+          do { print $fh "$k\t$index\t$c\n"; ++$index; } if $c > $tokencutoff;
+        }
+    }
+}
+
+sub load_hash ($$)
+{
+  if ($mode ne "preprocess")
+    {
+      my ($filename, $hash) = @_;
+      my $fh = new IO::File $filename, "r" or die "$filename: $!";
+    
+      while (defined ($_ = <$fh>))
+        {
+          chomp;
+          my ($k, $n, $c) = split /\t/, $_, 3;
+    
+          $hash->{$k} = [$n, $c];
+        }
+    }
+}
+
+my %excount;
+
+sub encodeany ($$$)
+{
+  my ($v, $dict, $off) = @_;
+
+  if ($mode eq "preprocess")
+    {
+      $dict->{$v} ||= [ scalar keys %$dict, 0 ];
+      ++$excount{$v};
+    }
+
+  return exists $dict->{$v} ? $dict->{$v}->[0] : $off + scalar keys %$dict;
+}
+
+sub clearexcount ($)
+{
+  my ($dict) = @_;
+
+  if ($mode eq "preprocess")
+    {
+      while (my ($k, $v) = each %excount)
+        {
+          die "wtf '$k'" unless exists $dict->{$k};
+    
+          if ($dict->{$k}->[1] < $v)
+            {
+              $dict->{$k}->[1] = $v;
+            }
+        }
+    }
+
+  %excount = ();
+}
+
+sub encodetri ($$)
+{
+  my ($v, $dict) = @_;
+
+  return encodeany ($v, $dict, 1);
+}
+
+sub encode ($$)
+{
+  my ($v, $dict) = @_;
+
+  return encodeany (" $v", $dict, 2);
+}
+
+sub morphofeatures ($$)
+{
+  my ($s, $codec) = @_;
+
+  my @morpho;
+
+  if ($s =~ m/^[[:upper:]]/)
+    {
+      push @morpho, (join ":", encode (" m:firstcap", $codec), 1);
+    }
+
+  if ($s !~ m/[[:lower:]]/)
+    {
+      push @morpho, (join ":", encode (" m:nolower", $codec), 1);
+    }
+
+  return @morpho;
+}
+
+sub process ($$)
+{
+  my ($fulls, $codec) = @_;
+
+  my $s = lc ($fulls);
+  my @morpho = morphofeatures ($fulls, $codec);
+  push @morpho, join ":", encode ($s, $codec), "1";
+
+  my @chars = split //, $s;
+  do
+    {
+      return join " ", @morpho;
+    }
+  if $#chars < $numchars;
+
+  my %trigrams;
+
+  foreach my $pos ($numchars .. $#chars)
+    {
+      ++$trigrams{join "", @chars[$pos-$numchars .. $pos]};
+    }
+
+  my $sum = 0;
+  while (my (undef, $v) = each %trigrams)
+    {
+      $sum += $v;
+    }
+
+  my @tristring;
+
+  while (my ($k, $v) = each %trigrams)
+    {
+      push @tristring, (join ":", 
+                          encodetri ($k, $codec),
+                          sprintf ("%.3f", sqrt ($v / $sum)));
+    }
+
+  return join " ", @tristring, @morpho;
+}
+
+sub features ($$$)
+{
+  my ($v, $trimemo, $codec) = @_;
+
+  if ($mode eq "preprocess")
+    {
+      # NB: memoization screws up the excount logic
+      return process ($v, $codec);
+    }
+  else
+    {
+      $trimemo->{$v} ||= process ($v, $codec);
+      return $trimemo->{$v};
+    }
+}
+
+sub tokenize ($)
+{
+  my ($s) = @_;
+
+  return grep { /\S/ }
+         map { s/[0-9]+/0/g; 
+                my @v = split /([[:punct:]]+)/, $_;
+                @v }
+              split /\s+/,
+              $s;
+}
+
+#----------------------------------------------------------------
+
+my %trimemo;
+my %vocab;
+
+sub printexample ($$$$$)
+{
+  my ($sid, $curspeaker, $context, $query1, $query2) = @_;
+
+  my $ml = "|MultiLabel 1 0";
+
+  if (rand () < 0.5)
+    {
+      my $tmp = $query1; $query1 = $query2; $query2 = $tmp;
+      $ml = "|MultiLabel 0 1";
+    }
+
+  my @fullcontext = tokenize $context;
+  my @context = @fullcontext > $ntk ? splice @fullcontext, -$ntk : @fullcontext;
+
+  my @speaking;
+
+  foreach my $pos (0 .. $#context)
+    {
+      my $tok = $context[$#context - $pos];
+      if ($tok eq '__' && $pos < $#context 
+          && $context[$#context - $pos - 1] eq 'eot')
+        {
+          $curspeaker = 3 - $curspeaker;
+        }
+      push @speaking, $curspeaker;
+    }
+  @speaking = reverse @speaking;
+  die "wtf $#speaking $#context" unless $#context == $#speaking;
+
+  my @fullquery1 = tokenize $query1;
+  my @query1 = @fullquery1 > $ntk ? splice @fullquery1, -$ntk : @fullquery1;
+  my @fullquery2 = tokenize $query2;
+  my @query2 = @fullquery2 > $ntk ? splice @fullquery2, -$ntk : @fullquery2;
+
+  while (@context || @query1 || @query2)
+    {
+      my $ct1 = @context ? "|Speaker @{[shift @speaking]}:1 |Context @{[features (shift @context, \%trimemo, \%vocab)]}" : "";
+      my $qt1 = @query1 ?  "|Query1Speaker $curspeaker:1 |Query1 @{[features (shift @query1, \%trimemo, \%vocab)]}" : "";
+      my $qt2 = @query2 ?  "|Query2Speaker $curspeaker:1 |Query2 @{[features (shift @query2, \%trimemo, \%vocab)]}" : "";
+
+      print "$sid $ct1 $qt1 $qt2 $ml\n";
+
+      $ml = "";
+    }
+}
+
+sub conv2turns ($)
+{
+  my ($conv) = @_;
+
+  my @turns;
+
+  my $firstutt = shift @$conv;
+  my $lastspeaker = $firstutt->[0];
+  my @thisturn;
+
+  push @thisturn, $firstutt->[1];
+
+  foreach my $utt (@$conv)
+    {
+      if ($lastspeaker ne $utt->[0])
+        {
+          my @thisturncopy = @thisturn;
+          push @turns, [ $lastspeaker, \@thisturncopy ];
+          @thisturn = ();
+        }
+
+      $lastspeaker = $utt->[0];
+      push @thisturn, $utt->[1];
+    }
+
+  push @turns, [ $lastspeaker, \@thisturn ] if @thisturn;
+
+  return \@turns;
+}
+
+sub render_dialogue ($$$)
+{
+  my ($conv, $start, $end) = @_;
+
+  my @slice = @{$conv} [ $start .. $end ];
+  push @slice, [ [], [] ];
+
+  return join " __eot__ ", map { join " __eou__ ", @{$_->[1]}, '' } @slice;
+}
+
+sub output_examples ($$$)
+{
+  my ($sid, $conva, $convb) = @_;
+
+  my $turna = conv2turns ($conva);
+  my $turnb = conv2turns ($convb);
+
+  clearexcount (\%vocab);
+
+  foreach my $turnno (1 .. $#$turna)
+    {
+      my $context = render_dialogue ($turna, 0, $turnno-1);
+      my ($nextspeaker, undef) = @{$turna->[$turnno]};
+
+      my $distractor;
+      my $maxtries = 5;
+      do
+        {
+          $distractor = $turnb->[rand @$turnb];
+        }
+      while ($distractor->[0] ne $nextspeaker && --$maxtries > 0);
+
+      my $nextutts = render_dialogue ($turna, $turnno, $turnno);
+      my $distutts = render_dialogue ([$distractor],0,0);
+      my $nsnum = $nextspeaker eq 'AGENT' ? 1 : 2;
+
+      printexample ($$sid, $nsnum, $context, $nextutts, $distutts);
+      ++$$sid;
+    }
+}
+
+#----------------------------------------------------------------
+
+load_hash ($vocabfile, \%vocab);
+
+my $sid = 1;
+my $bufsize = 100;
+my @conversations = map { undef } (1 .. $bufsize);
+
+# 00000bf2-7214-4b81-8abb-73414faedb43	0	AGENT	Hi, thanks for visiting Answer Desk! I'm XX_FirstName_XX J.	[{"Label":"GREET","Value":"","Score":1.0}]	12/28/2015 10:11:35 PM
+# 00000bf2-7214-4b81-8abb-73414faedb43	1	AGENT	Hello.	[{"Label":"GREET","Value":"","Score":1.0}]	12/28/2015 10:11:39 PM
+# 00000bf2-7214-4b81-8abb-73414faedb43	2	AGENT	May I know your full name, email address and the country you are contacting us from, please?	[{"Label":"INFO","Value":"","Score":1.0}]	12/28/2015 10:11:40 PM
+
+
+my @cur;
+my $lastguid;
+
+LINE: while (defined ($_ = <>))
+  {
+    chomp;
+    my ($guid, $uttno, $speaker, $utt, undef) = split /\t/, $_, 5;
+
+    if ($mode eq "preprocess" || $mode eq "train")
+      {
+#        next LINE if substr ($guid, 0, 1) eq 'e' || substr ($guid, 0, 1) eq 'f';
+        next LINE unless substr ($guid, -1) eq '0';
+      }
+    elsif ($mode eq "valid")
+      {
+#        next LINE unless substr ($guid, 0, 1) eq 'e';
+        next LINE unless substr ($guid, -3) eq 'eee';
+      }
+    elsif ($mode eq "test")
+      {
+#        next LINE unless substr ($guid, 0, 1) eq 'f';
+        next LINE unless substr ($guid, -3) eq 'fff';
+      }
+    else
+      {
+        die "wtf $mode";
+      }
+
+    die "wtf '$speaker'" unless $speaker eq 'AGENT' || $speaker eq 'USER';
+
+    next LINE unless $utt =~ /\w/;
+
+    if (defined ($lastguid) && $guid ne $lastguid && @cur)
+      {
+        my $index = int rand @conversations;
+
+        if (defined ($conversations[$index]))
+          {
+            output_examples (\$sid, \@cur, $conversations[$index]); 
+            last LINE if $sid > $maxsid;
+          }
+
+        my @curcopy = @cur;
+        $conversations[$index] = \@curcopy;
+        @cur = ();
+      }
+
+    push @cur, [ $speaker, $utt ];
+    $lastguid = $guid;
+  }
+
+@conversations = grep { defined } @conversations;
+
+@cur = pop @conversations if @conversations && not @cur;
+
+FINISH: foreach my $conv (@conversations)
+  {
+    output_examples (\$sid, \@cur, $conv);
+    last FINISH if $sid > $maxsid;
+    @cur = @$conv;
+  }
+
+save_hash ($vocabfile, \%vocab);

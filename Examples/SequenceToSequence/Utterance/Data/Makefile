@@ -1,17 +1,14 @@
 
 ntk:=80
-maxsid:=10000000
-tcut:=19
+maxsid:=1000000
+tcut:=6
 
-all: utt.train utt.test utt.valid
+all: $(foreach split,train test valid,shortutt6tri.$(split))
 
-uttvocab: uttpair2train uttpairs.train.tsv.gz
-	zcat $(word 2,$^) | perl ./$(word 1,$^) preprocess $@ $(maxsid) 2 $(ntk) $(tcut) > /dev/null
+shortvocab6tri: UtteranceLabels.tsv utterance2trainv6trishort
+	iconv -f utf-16 -t utf-8 $< | perl ./$(word 2,$^) preprocess $@ $(maxsid) 2 $(ntk) $(tcut) > /dev/null
 
-utt.%: uttpair2train uttpairs.%.tsv.gz uttvocab
-	zcat $(word 2,$^) | perl ./$(word 1,$^) $* uttvocab $(maxsid) 2 $(ntk) $(tcut) > /data/utterance/$@
+shortutt6tri.%: UtteranceLabels.tsv utterance2trainv6trishort shortvocab6tri
+	iconv -f utf-16 -t utf-8 $< | perl ./$(word 2,$^) $* $(word 3,$^) $(maxsid) 2 $(ntk) $(tcut) > /data/utterance/$@
 	ln -sf /data/utterance/$@ .
 
-uttpairs.%.tsv.gz: makeutterancedata.py UtteranceLabels.tsv
-	iconv -f utf-16 -t utf-8 $(word 2,$^) | python ./$(word 1,$^) $* | gzip > /data/utterance/$@
-	ln -sf /data/utterance/$@ .
