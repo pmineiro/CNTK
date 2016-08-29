@@ -1,8 +1,8 @@
 .SECONDARY:
 
 ntk:=80
-maxsid:=10000000
-tcut:=6
+maxsid:=100000000
+tcut:=24
 
 all: shortubuntu3tri.megatrain shortubuntu3tri.valid shortubuntu3tri.test shortubuntu6tri.megatrain shortubuntu6tri.valid shortubuntu6tri.test
 
