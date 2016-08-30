@@ -1,18 +1,3 @@
-########################################################################
-# trigram variant, with attention 
-# 
-# no zoneout, dropout=0.2: 
-# 19+...
-# Finished Epoch[ 4 of 200]: [Training] ce = 0.22072354 * 200000; errs = 9.290% * 200000; totalSamplesSeen = 800000; learningRatePerSample = 9.3243162e-07; epochTime=2267.51s
-# Finished Epoch[ 4 of 200]: [Validate] ce = 0.45519607 * 19560; errs = 16.017% * 19560
-#
-# full dataset:
-#
-# Finished Epoch[ 2 of 200]: [Training] ce = 0.24944411 * 898142; errs = 10.668%* 898142; totalSamplesSeen = 1796284; learningRatePerSample = 9.7656248e-06; epochTime=10109.7s
-# Finished Epoch[ 2 of 200]: [Validate] ce = 0.24193198 * 19560; errs = 10.184% * 19560
-#
-########################################################################
-
 RunRootDir = ".."      # default if not overridden
 DataDir    = "$RunRootDir$/Data"
 OutDir     = "$RunRootDir$/Out"
@@ -154,7 +139,7 @@ else
 train = [
   action = "train"
   traceLevel = 1
-  epochSize = 0
+  epochSize = $epochSize$
 
   reader = [
     readerType = "CNTKTextFormatReader"
