@@ -42,16 +42,24 @@ last query tokens, full dataset x2:
 eSize=20M:
 (pm) baseline, bursty tcut=4: 13.4/11.9 @ 15 (4.4M) (stopped)
 (pm) baseline, bursty tcut=8: 10.7/10.0 @ 26 (7.7M) 
-(pm) baseline, bursty tcut=8, passthrough, eSize=40M: 16.0/13.9 @ 6 (3.5M) ...
+(pm) baseline, bursty tcut=8, passthrough, eSize=40M: 11.1/10.5 @ 18 (10M) (stopped)
 (chonto) baseline, bursty tcut=6: 10.6/9.6 @ 22 (6.5M) (stopped @ 7e-9)
-(chonto) baseline, bursty tcut=6, passthrough: 11.1/10.1 @ 16 (4.7M) ...
-(g2) baseline, bursty tcut=6, passthrough, first query tokens: 10.4/9.6 @ 21 (6.3M) ...
+(chonto) baseline, bursty tcut=6, passthrough: 10.7/9.8 @ 24 (7.1M)
+(g2) baseline, bursty tcut=6, passthrough, first query tokens: 10.4/9.6 @ 24 (7.1M) 
 (g2) baseline, bursty tcut=6, eSize=40M: 10.8/10.3 @ 20 (12M) (stopped)
-(g2) baseline, bursty tcut=6, passthrough, eSize=40M: 9.7/8.9 @ 19 (11M) ...
-(g2) baseline, bursty tcut=6, passthrough, eSize=0, clip=1e-3: ...
-(g2) baseline, bursty tcut=6, first query tokens, eSize=40M: 11.5/10.5 @ 16 (9.5M) ...
+(*) (g2) baseline, bursty tcut=6, passthrough, eSize=40M: 9.7/8.9 @ 19 (11M) (killed) (3pmv)
+(g2) baseline, bursty tcut=6, first query tokens, eSize=40M: 11.5/10.5 @ 16 (9.5M) (killed)
 (gcr) baseline, bursty tcut=6, +speaker: 11.5/10.6 @ 23 (6.8M) (stopped)
-(gcr) baseline, bursty tcut=6, passthrough, +speaker, eSize=40M: 13.5/12.2 @ 7 (4.1M) ...
+(gcr) baseline, bursty tcut=6, passthrough, +speaker, eSize=40M: 13.5/12.2 @ 7 (4.1M) (stopped 6pmv)
+
+
+(g2) baseline, bursty tcut=6, passthrough, eSize=0, clip=1e-4: 9.1/8.6 @ 13 (23M) (stopped @ 2e-7)
+(gcr) baseline, bursty tcut=6x2, passthrough, eSize=40M, x4, clip=1e-3: 10.0/9.3 @ 19 (11M) (stopped @ 2e-7)
+
+(*) (chonto) baseline, bursty tcut=6x4, passthrough, eSize=40M, x8, clip=1e-3: 9.1/8.1 @ 20 (12M) ... (stopped @ 9e-7) test=[91.49, 91.89, 92.27]
+  (g2) ibid, hiddenDim=448: 8.8/7.9 @ 22 (13M) test=[91.54, 91.93, 92.32]
+  (chonto) ibid, hiddenDim=512: 9.2/8.3 @ 22 (13M) 
+(gcr) baseline, +speaker, bursty tcut=6x4, passthrough, eSize=40M, x8, clip=1e-3: 9.9/9.0 @ 14 (8.3M) ...
 
 ----------------------
 

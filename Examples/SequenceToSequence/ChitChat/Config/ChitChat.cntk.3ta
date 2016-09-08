@@ -6,21 +6,21 @@ epochSize = 0
 command = train
 
 deviceId = auto 
-ExpId = ubuntu-3
+ExpId = chitchat-3
 
-modelPath  = "$OutDir$/$ExpId$/Ubuntu.dnn"
-stderr     = "$OutDir$/$ExpId$/Ubuntu"
+modelPath  = "$OutDir$/$ExpId$/ChitChat.dnn"
+stderr     = "$OutDir$/$ExpId$/ChitChat"
 
 fileext = "tri" 
 vocabDim = 15915
-hiddenDim = 448
-embeddingDim = 448
+hiddenDim = 384
+embeddingDim = 384
 maxLayer = 1
 initLearningRate = 0.5
 dropoutRate = 0.2
 minibatchSize = 1024:2048
 momentum = 0.5:0.9
-clipping = 1e-3
+clipping = 1e-4
 epochSize = 0
 restartFrom = "/dev/null"
 addZoneout = false
@@ -143,7 +143,7 @@ train = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3$fileext$.megatrain"
+    file = "$DataDir$/shortchitchat3$fileext$.train"
     randomize = "true"
 
     input = $globalInput$
@@ -151,7 +151,7 @@ train = [
 
   cvReader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3$fileext$.valid"
+    file = "$DataDir$/shortchitchat3$fileext$.valid"
     randomize = "false"
 
     input = $globalInput$
@@ -188,7 +188,7 @@ test = [
 
   reader = [
     readerType = "CNTKTextFormatReader"
-    file = "$DataDir$/shortubuntu3$fileext$.test"
+    file = "$DataDir$/shortchitchat3$fileext$.test"
     randomize = "false"
 
     input = $globalInput$

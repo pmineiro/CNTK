@@ -1,0 +1,300 @@
+#! /usr/bin/env perl
+
+use warnings;
+use strict;
+
+use Data::Dumper;
+
+srand 8675309;
+
+my $mode = shift @ARGV or die;
+my $vocabfile = shift @ARGV or die;
+my $maxsid = shift @ARGV or die;
+my $numchars = shift @ARGV or die; # trigrams = 2, quadgrams = 3, etc.
+my $ntk = shift @ARGV or die; 
+my $tokencutoff = shift @ARGV or die;
+
+sub save_hash ($$)
+{
+  if ($mode eq "preprocess")
+    {
+      my ($filename, $hash) = @_;
+      my $fh = new IO::File $filename, "w" or die "$filename: $!";
+      $fh->binmode (":utf8");
+
+      my $index = 1;
+    
+      while (my ($k, $v) = each %$hash)
+        {
+          my (undef, $c) = @$v;
+          do { print $fh "$k\t$index\t$c\n"; ++$index; } if $c > $tokencutoff;
+        }
+    }
+}
+
+sub load_hash ($$)
+{
+  if ($mode ne "preprocess")
+    {
+      my ($filename, $hash) = @_;
+      my $fh = new IO::File $filename, "r" or die "$filename: $!";
+    
+      while (defined ($_ = <$fh>))
+        {
+          chomp;
+          my ($k, $n, $c) = split /\t/, $_, 3;
+    
+          $hash->{$k} = [$n, $c];
+        }
+    }
+}
+
+my %excount;
+
+sub encodeany ($$$)
+{
+  my ($v, $dict, $off) = @_;
+
+  if ($mode eq "preprocess")
+    {
+      $dict->{$v} ||= [ scalar keys %$dict, 0 ];
+      ++$excount{$v};
+    }
+
+  return exists $dict->{$v} ? $dict->{$v}->[0] : $off + scalar keys %$dict;
+}
+
+sub clearexcount ($)
+{
+  my ($dict) = @_;
+
+  if ($mode eq "preprocess")
+    {
+      while (my ($k, $v) = each %excount)
+        {
+          die "wtf '$k'" unless exists $dict->{$k};
+    
+          if ($dict->{$k}->[1] < $v)
+            {
+              $dict->{$k}->[1] = $v;
+            }
+        }
+    }
+
+  %excount = ();
+}
+
+sub encodetri ($$)
+{
+  my ($v, $dict) = @_;
+
+  return encodeany ($v, $dict, 1);
+}
+
+sub encode ($$)
+{
+  my ($v, $dict) = @_;
+
+  return encodeany (" $v", $dict, 2);
+}
+
+sub morphofeatures ($$)
+{
+  my ($s, $codec) = @_;
+
+  my @morpho;
+
+  if ($s =~ m/^[[:upper:]]/)
+    {
+      push @morpho, (join ":", encode (" m:firstcap", $codec), 1);
+    }
+
+  if ($s !~ m/[[:lower:]]/)
+    {
+      push @morpho, (join ":", encode (" m:nolower", $codec), 1);
+    }
+
+  return @morpho;
+}
+
+sub process ($$)
+{
+  my ($fulls, $codec) = @_;
+
+  my $s = lc ($fulls);
+  my @morpho = morphofeatures ($fulls, $codec);
+  push @morpho, join ":", encode ($s, $codec), "1";
+
+  my @chars = split //, $s;
+  do
+    {
+      return join " ", @morpho;
+    }
+  if $#chars < $numchars;
+
+  my %trigrams;
+
+  foreach my $pos ($numchars .. $#chars)
+    {
+      ++$trigrams{join "", @chars[$pos-$numchars .. $pos]};
+    }
+
+  my $sum = 0;
+  while (my (undef, $v) = each %trigrams)
+    {
+      $sum += $v;
+    }
+
+  my @tristring;
+
+  while (my ($k, $v) = each %trigrams)
+    {
+      push @tristring, (join ":", 
+                          encodetri ($k, $codec),
+                          sprintf ("%.3f", sqrt ($v / $sum)));
+    }
+
+  return join " ", @tristring, @morpho;
+}
+
+sub features ($$$)
+{
+  my ($v, $trimemo, $codec) = @_;
+
+  if ($mode eq "preprocess")
+    {
+      # NB: memoization screws up the excount logic
+      return process ($v, $codec);
+    }
+  else
+    {
+      $trimemo->{$v} ||= process ($v, $codec);
+      return $trimemo->{$v};
+    }
+}
+
+sub tokenize ($)
+{
+  my ($s) = @_;
+
+  return grep { /\S/ }
+         map { s/[0-9]+/0/g; 
+                my @v = split /([[:punct:]]+)/, $_;
+                @v }
+              split /\s+/,
+              $s;
+}
+
+#----------------------------------------------------------------
+
+my %trimemo;
+my %vocab;
+
+sub printexample ($$$$)
+{
+  my ($sid, $context, $query1, $query2) = @_;
+
+  my $ml = "|MultiLabel 1 0";
+
+  if ($mode ne "test")
+    {
+      if (rand () < 0.5)
+        {
+          my $tmp = $query1; $query1 = $query2; $query2 = $tmp;
+          $ml = "|MultiLabel 0 1";
+        }
+    }
+
+  my @fullcontext = tokenize $context;
+  my @context = @fullcontext > $ntk ? splice @fullcontext, -$ntk : @fullcontext;
+  my @fullquery1 = tokenize $query1;
+  my @query1 = @fullquery1 > $ntk ? splice @fullquery1, -$ntk : @fullquery1;
+  my @fullquery2 = tokenize $query2;
+  my @query2 = @fullquery2 > $ntk ? splice @fullquery2, -$ntk : @fullquery2;
+
+  if ($mode eq "test")
+    {
+      @query1 = ('blorf') unless @query1;
+      @query2 = ('blorf') unless @query2;
+    }
+
+  while (@context || @query1 || @query2)
+    {
+      my $ct1 = @context ? "|Context @{[features (shift @context, \%trimemo, \%vocab)]}" : "";
+      my $qt1 = @query1 ?  "|Query1 @{[features (shift @query1, \%trimemo, \%vocab)]}" : "";
+      my $qt2 = @query2 ?  "|Query2 @{[features (shift @query2, \%trimemo, \%vocab)]}" : "";
+
+      print "$sid $ct1 $qt1 $qt2 $ml\n";
+
+      $ml = "";
+    }
+}
+
+#----------------------------------------------------------------
+
+load_hash ($vocabfile, \%vocab);
+
+my $sid = 1;
+my $context = '';
+my $lastresponse;
+my $trueresponse;
+
+<>; # eat header
+
+LINE: while (defined ($_ = <>))
+  {
+    s/\r\n/\n/g;
+    chomp;
+    my ($qid, $label, $prevq, $preva, $query, $response, undef) = split /\t/, $_;
+
+    my $sep = " __eou__ __eot__ ";
+    my $thiscontext = join $sep, $prevq, $preva, $query, '';
+
+    if ($mode eq "test")
+      {
+        if ($context ne $thiscontext)
+          {
+            if ($lastresponse)
+              {
+                printexample ($sid++, $context, $lastresponse, $lastresponse);
+                undef $lastresponse;
+              }
+
+            $context = $thiscontext;
+          }
+
+        if ($lastresponse)
+          {
+            printexample ($sid++, $context, $lastresponse, $response);
+            undef $lastresponse;
+          }
+        else
+          {
+            $lastresponse = $response;
+          }
+      }
+    else
+      {
+        if ($context ne $thiscontext)
+          {
+            die "oops $label" unless $label == 1;
+            $context = $thiscontext;
+            $trueresponse = $response;
+          }
+        else
+          {
+            printexample ($sid++, $context, $trueresponse, $response);
+          }
+      }
+  }
+
+if ($mode eq "test")
+  {
+    if ($lastresponse)
+      {
+        printexample ($sid++, $context, $lastresponse, $lastresponse);
+        undef $lastresponse;
+      }
+  }
+
+save_hash ($vocabfile, \%vocab);
