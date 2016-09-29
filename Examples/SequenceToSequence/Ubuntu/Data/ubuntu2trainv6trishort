@@ -23,7 +23,7 @@ sub save_hash ($$)
       my $fh = new IO::File $filename, "w" or die "$filename: $!";
       $fh->binmode (":utf8");
 
-      my $index = 1;
+      my $index = 0;
     
       while (my ($k, $v) = each %$hash)
         {
